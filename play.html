@@ -110,8 +110,8 @@
                 
                 loading.textContent = 'Loading Pygame... 🎮';
                 
-                // Загружаем pygame-ce (community edition для web)
-                await pyodide.loadPackage(['pygame-ce']);
+                // Загружаем pygame
+                await pyodide.loadPackage(['pygame']);
                 
                 loading.textContent = 'Loading game code... 📥';
                 
