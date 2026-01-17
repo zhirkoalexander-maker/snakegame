@@ -4,93 +4,216 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Snake Game</title>
-    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
-    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            min-height: 100vh;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            font-family: 'Arial', sans-serif;
-            color: #fff;
+            padding: 20px;
         }
-        
-        h1 {
-            font-size: 3em;
-            margin: 20px 0;
-            text-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-            color: #00ff00;
-        }
-        
-        #output {
-            background: #000;
-            padding: 10px;
-            border-radius: 10px;
-            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
-            border: 2px solid #00ff00;
-        }
-        
-        .info {
-            margin-top: 20px;
+
+        .container {
+            max-width: 800px;
             text-align: center;
+        }
+
+        h1 {
+            font-size: 4em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(0, 255, 0, 0.7);
+            color: #00ff00;
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 30px rgba(0, 255, 0, 0.7); }
+            50% { text-shadow: 0 0 50px rgba(0, 255, 0, 1); }
+        }
+
+        .subtitle {
+            font-size: 1.5em;
+            margin-bottom: 30px;
             color: #aaa;
         }
-        
-        .loading {
-            font-size: 1.5em;
-            color: #00ff00;
-            animation: pulse 1.5s infinite;
-            margin: 20px;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .controls {
-            margin-top: 15px;
-            padding: 15px;
+
+        .features {
             background: rgba(0, 0, 0, 0.5);
-            border-radius: 8px;
-            max-width: 600px;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
-        
-        .controls h3 {
-            margin: 0 0 10px 0;
+
+        .features h2 {
             color: #00ff00;
+            margin-bottom: 20px;
         }
-        
-        .controls p {
-            margin: 5px 0;
-            font-size: 0.9em;
+
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .features li {
+            padding: 10px 0;
+            font-size: 1.1em;
+        }
+
+        .features li::before {
+            content: "🎮 ";
+            margin-right: 10px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .btn-primary:hover {
+            background: #00cc00;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #fff;
+            border: 2px solid #00ff00;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+            transform: scale(1.05);
+        }
+
+        .instructions {
+            margin-top: 40px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .instructions h3 {
+            color: #00ff00;
+            margin-bottom: 15px;
+        }
+
+        .instructions ol {
+            text-align: left;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .instructions li {
+            padding: 8px 0;
+        }
+
+        .snake-icon {
+            font-size: 5em;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .controls-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border-left: 4px solid #00ff00;
+        }
+
+        .controls-info h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>🐍 Super Snake Game 🐍</h1>
-    
-    <div class="loading" id="loading">Loading Python and Pygame... (30-60 sec)</div>
-    
-    <script type="py" src="./main.py" config='{"packages": ["pygame-ce"]}'></script>
-    
-    <div id="output"></div>
-    
-    <div class="controls">
-        <h3>📋 Controls</h3>
-        <p>🎮 Navigate menus with Arrow Keys or WASD</p>
-        <p>⚙️ Press C to configure custom controls</p>
-        <p>🚀 Use Shift keys for speed boost (configurable)</p>
-        <p>🎯 Choose from Single Player, PvP, or Bot modes</p>
-    </div>
-    
-    <div class="info">
-        <p>Made with Pygame & PyScript | © 2026</p>
+    <div class="container">
+        <div class="snake-icon">🐍</div>
+        <h1>SUPER SNAKE GAME</h1>
+        <p class="subtitle">Classic Snake with modern features!</p>
+
+        <div class="features">
+            <h2>✨ Features</h2>
+            <ul>
+                <li>Multiple game modes: Single Player, PvP, Bot</li>
+                <li>Customizable controls for both players</li>
+                <li>Three difficulty levels</li>
+                <li>Configurable speed boost</li>
+                <li>Beautiful graphics and smooth gameplay</li>
+            </ul>
+        </div>
+
+        <div class="buttons">
+            <a href="https://github.com/zhirkoalexander-maker/snakegame/archive/refs/heads/main.zip" class="btn btn-primary">
+                📥 Download Game
+            </a>
+            <a href="https://github.com/zhirkoalexander-maker/snakegame" class="btn btn-secondary" target="_blank">
+                📂 View on GitHub
+            </a>
+        </div>
+
+        <div class="instructions">
+            <h3>🚀 How to Play</h3>
+            <ol>
+                <li>Download the game (ZIP file)</li>
+                <li>Extract the files</li>
+                <li>Install Python 3.8+ if not installed</li>
+                <li>Run: <code style="background: #000; padding: 3px 8px; border-radius: 4px;">pip install pygame</code></li>
+                <li>Run: <code style="background: #000; padding: 3px 8px; border-radius: 4px;">python main.py</code></li>
+                <li>Enjoy! 🎮</li>
+            </ol>
+        </div>
+
+        <div class="controls-info">
+            <h3>🎮 Default Controls</h3>
+            <p><strong>Player 1:</strong> Arrow Keys + Right Shift (speedup)</p>
+            <p><strong>Player 2:</strong> WASD + Left Shift (speedup)</p>
+            <p style="margin-top: 10px; color: #aaa;">All controls are customizable in-game!</p>
+        </div>
+
+        <div style="margin-top: 40px; color: #666;">
+            <p>Made with ❤️ using Pygame</p>
+            <p style="margin-top: 10px;">© 2026 - Free to use and modify</p>
+        </div>
     </div>
 </body>
 </html>
