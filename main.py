@@ -124,6 +124,8 @@ import random
 import os
 import asyncio
 import sys
+import json
+from pathlib import Path
 
 # Проверяем, запущено ли в браузере
 RUNNING_IN_BROWSER = sys.platform == "emscripten"
@@ -133,7 +135,7 @@ WIDTH = 600
 HEIGHT = 600
 CELL_SIZE = 20
 FPS = 60
-FOOD_TYPES = ['normal', 'gold']
+FOOD_TYPES = ['normal', 'gold', 'poison']
 
 # Цвета
 BLACK = (0, 0, 0)
@@ -143,6 +145,90 @@ WHITE = (255, 255, 255)
 GRAY = (128, 128, 128)
 GOLD = (255, 215, 0)
 BLUE = (0, 0, 255)
+PURPLE = (153, 0, 255)
+
+# Темы
+THEMES = {
+    'classic': {'bg': BLACK, 'grid': (20, 20, 20)},
+    'forest': {'bg': (13, 38, 13), 'grid': (26, 58, 26)},
+    'ocean': {'bg': (0, 26, 51), 'grid': (0, 51, 102)},
+    'neon': {'bg': (10, 10, 26), 'grid': (26, 0, 51)},
+    'sunset': {'bg': (51, 25, 0), 'grid': (76, 38, 0)}
+}
+
+# Настройки
+SETTINGS_FILE = Path.home() / '.snake_game_settings.json'
+LEADERBOARD_FILE = Path.home() / '.snake_game_leaderboard.json'
+
+def load_settings():
+    try:
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return {'theme': 'classic', 'sound': True}
+
+def save_settings(settings):
+    try:
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f)
+    except:
+        pass
+
+def load_leaderboard():
+    try:
+        if LEADERBOARD_FILE.exists():
+            with open(LEADERBOARD_FILE, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return []
+
+def save_leaderboard(leaderboard):
+    try:
+        with open(LEADERBOARD_FILE, 'w') as f:
+            json.dump(leaderboard, f)
+    except:
+        pass
+
+def add_score_to_leaderboard(score, mode):
+    leaderboard = load_leaderboard()
+    from datetime import datetime
+    leaderboard.append({
+        'score': score,
+        'mode': mode,
+        'date': datetime.now().strftime('%Y-%m-%d %H:%M')
+    })
+    leaderboard.sort(key=lambda x: x['score'], reverse=True)
+    save_leaderboard(leaderboard[:10])
+
+# Звуковые эффекты
+def play_sound(sound_type):
+    settings = load_settings()
+    if not settings.get('sound', True):
+        return
+    try:
+        # Определяем параметры звука по типу
+        sound_params = {
+            'eat': (440, 0.1),
+            'golden': (880, 0.15),
+            'poison': (220, 0.2),
+            'death': (110, 0.3)
+        }
+        freq, duration = sound_params.get(sound_type, (440, 0.1))
+        
+        # Создаем простой звук
+        sample_rate = 22050
+        samples = int(sample_rate * duration)
+        arr = []
+        for i in range(samples):
+            val = int(32767 * 0.3 * (1 if (i * freq * 2 / sample_rate) % 1 < 0.5 else -1))
+            arr.append([val, val])
+        sound = pygame.sndarray.make_sound(arr)
+        sound.play()
+    except:
+        pass  # Звук не обязателен
 
 class Menu:
     def __init__(self, screen):
@@ -157,12 +243,14 @@ class Menu:
         self.colors = [GREEN, BLUE, RED, (255,255,0), (255,0,255), (0,255,255), (255,128,0), (128,0,255), (0,255,128)]
         self.color_names = ["Green", "Blue", "Red", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Aqua"]
         self.modes = ["Single", "PvP", "Bot"]
-        self.walls_types = ["With walls", "No walls"]
+        self.walls_types = ["With walls", "No walls", "Teleport"]
         self.selected = 0
-        self.step = 'start'  # 'start', 'mode', 'walls', 'level', 'color', 'controls'
+        self.step = 'start'  # 'start', 'mode', 'walls', 'level', 'color', 'controls', 'settings', 'leaderboard'
         self.selected_mode = 0
         self.selected_walls = 0
         self.selected_level = 0
+        self.settings = load_settings()
+        self.current_theme = self.settings.get('theme', 'classic')
         # Фоновая игра для меню
         self.background_game = None
         self.bg_last_move = 0
@@ -196,7 +284,7 @@ class Menu:
         # Отрисовываем фоновую игру
         if self.background_game is None or not any(s.alive for s in self.background_game.snakes):
             # Создаём новую фоновую игру с одним ботом
-            bg_game = SnakeGame(100, GREEN, mode='single', walls_type='No walls')
+            bg_game = SnakeGame(100, GREEN, mode='single', walls_type='No walls', theme='classic', settings=self.settings)
             bg_game.screen = self.screen
             # Делаем змею ботом
             bg_game.snakes[0].is_bot = True
@@ -341,10 +429,24 @@ class Menu:
             self.screen.blit(exit_text, exit_text_rect)
             self.clickable_rects.append(('exit', exit_button))
             
+            # Кнопка Settings
+            settings_button = pygame.Rect(center_x - 230, center_y + 155, 100, 40)
+            pygame.draw.rect(self.screen, GRAY, settings_button)
+            settings_txt = self.small_font.render("⚙️", True, WHITE)
+            self.screen.blit(settings_txt, settings_txt.get_rect(center=settings_button.center))
+            self.clickable_rects.append(('settings', settings_button))
+            
+            # Кнопка Leaderboard
+            leader_button = pygame.Rect(center_x + 130, center_y + 155, 100, 40)
+            pygame.draw.rect(self.screen, GOLD, leader_button)
+            leader_txt = self.small_font.render("🏆", True, BLACK)
+            self.screen.blit(leader_txt, leader_txt.get_rect(center=leader_button.center))
+            self.clickable_rects.append(('leaderboard', leader_button))
+            
             # Подзаголовок
             subtitle_font = pygame.font.SysFont(None, 28)
             subtitle = subtitle_font.render("Press ENTER to start", True, WHITE)
-            subtitle_rect = subtitle.get_rect(center=(center_x, center_y + 155))
+            subtitle_rect = subtitle.get_rect(center=(center_x, center_y + 210))
             self.screen.blit(subtitle, subtitle_rect)
             
             # Кнопка настроек
@@ -435,6 +537,72 @@ class Menu:
             back_text = inst_font.render("Press ESC or BACKSPACE to go back", True, GRAY)
             back_rect = back_text.get_rect(center=(center_x, center_y + 150))
             self.screen.blit(back_text, back_rect)
+        elif self.step == 'settings':
+            title = self.font.render("Settings", True, WHITE)
+            title_rect = title.get_rect(center=(center_x, center_y - 200))
+            self.screen.blit(title, title_rect)
+            
+            # Theme selection
+            theme_text = self.small_font.render("Theme:", True, WHITE)
+            self.screen.blit(theme_text, (center_x - 250, center_y - 140))
+            
+            for i, theme_name in enumerate(THEMES.keys()):
+                color = GREEN if self.current_theme == theme_name else WHITE
+                text = self.small_font.render(f"{i+1}. {theme_name.title()}", True, color)
+                button_rect = pygame.Rect(center_x - 250, center_y - 100 + i * 35, 200, 30)
+                pygame.draw.rect(self.screen, GRAY, button_rect, 2)
+                self.screen.blit(text, (center_x - 240, center_y - 95 + i * 35))
+                self.clickable_rects.append(('theme', theme_name, button_rect))
+            
+            # Sound toggle
+            sound_status = "ON" if self.settings['sound'] else "OFF"
+            sound_color = GREEN if self.settings['sound'] else RED
+            sound_text = self.small_font.render(f"Sound: {sound_status}", True, sound_color)
+            sound_button = pygame.Rect(center_x + 50, center_y - 100, 200, 40)
+            pygame.draw.rect(self.screen, GRAY, sound_button, 2)
+            self.screen.blit(sound_text, (center_x + 60, center_y - 90))
+            self.clickable_rects.append(('sound_toggle', sound_button))
+            
+            # Back button
+            back_button = pygame.Rect(center_x - 100, center_y + 150, 200, 50)
+            pygame.draw.rect(self.screen, GRAY, back_button)
+            back_text = self.small_font.render("Back", True, WHITE)
+            self.screen.blit(back_text, back_text.get_rect(center=back_button.center))
+            self.clickable_rects.append(('back_to_menu', back_button))
+            
+        elif self.step == 'leaderboard':
+            title = self.font.render("Leaderboard", True, GOLD)
+            title_rect = title.get_rect(center=(center_x, center_y - 200))
+            self.screen.blit(title, title_rect)
+            
+            leaderboard = load_leaderboard()
+            if leaderboard:
+                for i, entry in enumerate(leaderboard[:10]):
+                    rank_color = GOLD if i == 0 else (GRAY if i < 3 else WHITE)
+                    text = self.small_font.render(
+                        f"{i+1}. {entry['name']}: {entry['score']}", 
+                        True, 
+                        rank_color
+                    )
+                    self.screen.blit(text, (center_x - 150, center_y - 150 + i * 30))
+            else:
+                no_scores = self.small_font.render("No scores yet!", True, GRAY)
+                self.screen.blit(no_scores, no_scores.get_rect(center=(center_x, center_y)))
+            
+            # Clear button
+            clear_button = pygame.Rect(center_x - 220, center_y + 150, 120, 40)
+            pygame.draw.rect(self.screen, RED, clear_button)
+            clear_text = self.small_font.render("Clear", True, WHITE)
+            self.screen.blit(clear_text, clear_text.get_rect(center=clear_button.center))
+            self.clickable_rects.append(('clear_leaderboard', clear_button))
+            
+            # Back button
+            back_button = pygame.Rect(center_x + 100, center_y + 150, 120, 40)
+            pygame.draw.rect(self.screen, GRAY, back_button)
+            back_text = self.small_font.render("Back", True, WHITE)
+            self.screen.blit(back_text, back_text.get_rect(center=back_button.center))
+            self.clickable_rects.append(('back_to_menu', back_button))
+            
         # Кнопки увеличения/уменьшения размера окна (зум)
         button_font = pygame.font.SysFont(None, 28)
         plus_rect = pygame.Rect(self.screen.get_width() - 90, 10, 35, 35)
@@ -470,6 +638,33 @@ class Menu:
                     elif item[0] == 'exit':
                         if item[1].collidepoint(event.pos):
                             return None
+                    elif item[0] == 'settings':
+                        if item[1].collidepoint(event.pos):
+                            self.step = 'settings'
+                            return 'next'
+                    elif item[0] == 'leaderboard':
+                        if item[1].collidepoint(event.pos):
+                            self.step = 'leaderboard'
+                            return 'next'
+                    elif item[0] == 'theme':
+                        if item[2].collidepoint(event.pos):
+                            self.current_theme = item[1]
+                            self.settings['theme'] = item[1]
+                            save_settings(self.settings)
+                            return 'next'
+                    elif item[0] == 'sound_toggle':
+                        if item[1].collidepoint(event.pos):
+                            self.settings['sound'] = not self.settings['sound']
+                            save_settings(self.settings)
+                            return 'next'
+                    elif item[0] == 'back_to_menu':
+                        if item[1].collidepoint(event.pos):
+                            self.step = 'start'
+                            return 'next'
+                    elif item[0] == 'clear_leaderboard':
+                        if item[1].collidepoint(event.pos):
+                            save_leaderboard([])
+                            return 'next'
                     elif item[0] == 'mode':
                         if item[2].collidepoint(event.pos):
                             self.selected_mode = item[1]
@@ -652,7 +847,7 @@ class SnakeGame:
                     if (x, y) not in forbidden and x != 0 and y != 0 and x != (screen_w-1)*CELL_SIZE and y != (screen_h-1)*CELL_SIZE:
                         self.walls.append((x, y))
                         break
-    def __init__(self, move_delay, snake_color, mode='single', bot_color=BLUE, walls_type="Frame walls", controls_p1=None, controls_p2=None):
+    def __init__(self, move_delay, snake_color, mode='single', bot_color=BLUE, walls_type="Frame walls", controls_p1=None, controls_p2=None, theme='classic', settings=None):
         # Запретить совпадение цветов змеи и бота
         if bot_color == snake_color:
             alt_colors = [c for c in [GREEN, BLUE, RED, (255,255,0), (255,0,255), (0,255,255)] if c != snake_color]
@@ -661,6 +856,9 @@ class SnakeGame:
         self.snake_color = snake_color
         self.mode = mode
         self.bot_color = bot_color
+        self.theme = theme
+        self.theme_colors = THEMES.get(theme, THEMES['classic'])
+        self.settings = settings or load_settings()
         pygame.display.set_caption("Snake Game")
         self.clock = pygame.time.Clock()
         self.screen = None
@@ -781,8 +979,8 @@ class SnakeGame:
         field_height = self.screen.get_height()
         # Серые стены убивают только в режиме "With walls"
         walls_enabled = (self.walls_type == 'With walls')
-        # wrap_around только если нет стен (границ)
-        wrap_around = (self.walls_type == 'No walls')
+        # wrap_around если "No walls" или "Teleport"
+        wrap_around = (self.walls_type in ('No walls', 'Teleport'))
         # Бот управляет собой
         for snake in self.snakes:
             if snake.is_bot and snake.alive:
@@ -790,7 +988,7 @@ class SnakeGame:
         # Двигаем всех живых змей
         for snake in self.snakes:
             if snake.alive:
-                # wrap_around только если walls_type == 'No walls'
+                # wrap_around если walls_type == 'No walls' или 'Teleport'
                     snake.move(wrap_around=wrap_around, field_width=field_width, field_height=field_height)
         # Проверяем коллизии только для живых змей
         for snake in self.snakes:
@@ -812,12 +1010,37 @@ class SnakeGame:
             head_grid = (head[0] // CELL_SIZE * CELL_SIZE, head[1] // CELL_SIZE * CELL_SIZE)
             food_grid = (self.food['pos'][0] // CELL_SIZE * CELL_SIZE, self.food['pos'][1] // CELL_SIZE * CELL_SIZE)
             if head_grid == food_grid:
-                points = 3 if self.food['type'] == 'gold' else 1
+                food_type = self.food['type']
+                
+                if food_type == 'gold':
+                    points = 30
+                    growth = 3
+                    if self.settings['sound']:
+                        play_sound('golden')
+                elif food_type == 'poison':
+                    points = -10
+                    growth = -2  # Уменьшаем змею
+                    if self.settings['sound']:
+                        play_sound('poison')
+                else:  # normal
+                    points = 10
+                    growth = 1
+                    if self.settings['sound']:
+                        play_sound('eat')
+                
                 snake.score += points
-                growth = 3 if self.food['type'] == 'gold' else 1
-                snake.grow(growth)
+                if growth > 0:
+                    snake.grow(growth)
+                else:
+                    # Уменьшаем змею (убираем сегменты с конца)
+                    for _ in range(abs(growth)):
+                        if len(snake.body) > 1:
+                            snake.body.pop()
+                
                 self.food = self.random_food()
         if not any(s.alive for s in self.snakes):
+            if self.settings['sound']:
+                play_sound('death')
             self.game_over = True
         heads = [snake.get_head() for snake in self.snakes if snake.alive]
         for i, snake in enumerate(self.snakes):
@@ -827,12 +1050,26 @@ class SnakeGame:
                 if i != j and other.alive and snake.get_head() == other.get_head():
                     snake.alive = False
                     other.alive = False
+                    if self.settings['sound']:
+                        play_sound('death')
         if self.mode in ('single', 'bot', 'pvp'):
             if not self.snakes[0].alive or (len(self.snakes) > 1 and not self.snakes[1].alive):
+                if self.settings['sound']:
+                    play_sound('death')
                 self.game_over = True
 
     def draw(self):
-        self.screen.fill(BLACK)
+        # Применяем цвет фона из темы
+        bg_color = self.theme_colors['background']
+        self.screen.fill(bg_color)
+        
+        # Рисуем сетку с цветом из темы
+        grid_color = self.theme_colors['grid']
+        for x in range(0, self.screen.get_width(), CELL_SIZE):
+            pygame.draw.line(self.screen, grid_color, (x, 0), (x, self.screen.get_height()))
+        for y in range(0, self.screen.get_height(), CELL_SIZE):
+            pygame.draw.line(self.screen, grid_color, (0, y), (self.screen.get_width(), y))
+        
         # Кнопки увеличения/уменьшения размера окна (работают и в меню, и в игре)
         button_font = pygame.font.SysFont(None, 28)
         plus_rect = pygame.Rect(self.screen.get_width() - 90, 10, 35, 35)
@@ -871,25 +1108,29 @@ class SnakeGame:
         # Рисуем змей
         for snake in self.snakes:
             snake.draw(self.screen)
-        # Рисуем еду (красивое яблоко)
+        # Рисуем еду
         fx = (self.food['pos'][0] // CELL_SIZE) * CELL_SIZE
         fy = (self.food['pos'][1] // CELL_SIZE) * CELL_SIZE
         
         if self.food['type'] == 'gold':
             # Золотое яблоко
             food_color = GOLD
-            darker_gold = (200, 170, 0)
+            darker_color = (200, 170, 0)
+        elif self.food['type'] == 'poison':
+            # Фиолетовое яблоко (яд)
+            food_color = PURPLE
+            darker_color = (100, 0, 150)
         else:
             # Красное яблоко
             food_color = RED
-            darker_gold = (180, 0, 0)
+            darker_color = (180, 0, 0)
         
         # Тень
         shadow_color = (50, 50, 50)
         pygame.draw.circle(self.screen, shadow_color, (fx + CELL_SIZE // 2 + 2, fy + CELL_SIZE - 3), CELL_SIZE // 3)
         
         # Основное яблоко (круг) с градиентом
-        pygame.draw.circle(self.screen, darker_gold, (fx + CELL_SIZE // 2 + 1, fy + CELL_SIZE // 2 + 1), CELL_SIZE // 2 - 2)
+        pygame.draw.circle(self.screen, darker_color, (fx + CELL_SIZE // 2 + 1, fy + CELL_SIZE // 2 + 1), CELL_SIZE // 2 - 2)
         pygame.draw.circle(self.screen, food_color, (fx + CELL_SIZE // 2, fy + CELL_SIZE // 2), CELL_SIZE // 2 - 2)
         
         # Темная обводка
@@ -907,10 +1148,22 @@ class SnakeGame:
             (fx + CELL_SIZE // 2 + 3, fy + 6)
         ]
         pygame.draw.polygon(self.screen, leaf_color, leaf_points)
+        
+        # High Score в левом верхнем углу
         font = pygame.font.SysFont(None, 36)
+        leaderboard = load_leaderboard()
+        high_score = leaderboard[0]['score'] if leaderboard else 0
+        high_score_text = font.render(f"High Score: {high_score}", True, GOLD)
+        self.screen.blit(high_score_text, (10, 10))
+        
+        # Score текущих игроков
         for i, snake in enumerate(self.snakes):
-            text = font.render(f"P{i+1} Score: {snake.score}", True, snake.color)
-            self.screen.blit(text, (10, 10 + i * 30))
+            if self.mode == "bot":
+                label = "Player" if i == 0 else "Bot"
+            else:
+                label = f"P{i+1}"
+            text = font.render(f"{label}: {snake.score}", True, snake.color)
+            self.screen.blit(text, (10, 50 + i * 35))
         pygame.display.flip()
 
     def bot_move(self, snake):
@@ -973,7 +1226,61 @@ class SnakeGame:
         
         snake.next_direction = best
 
+    async def get_player_name(self):
+        """Запрашивает имя игрока для таблицы лидеров"""
+        name = ""
+        input_active = True
+        font = pygame.font.SysFont(None, 48)
+        small_font = pygame.font.SysFont(None, 32)
+        
+        while input_active:
+            self.screen.fill(BLACK)
+            center_x = self.screen.get_width() // 2
+            center_y = self.screen.get_height() // 2
+            
+            # Заголовок
+            title = font.render("Enter Your Name:", True, WHITE)
+            title_rect = title.get_rect(center=(center_x, center_y - 80))
+            self.screen.blit(title, title_rect)
+            
+            # Поле ввода
+            input_box = pygame.Rect(center_x - 150, center_y - 20, 300, 50)
+            pygame.draw.rect(self.screen, WHITE, input_box, 2)
+            name_surface = small_font.render(name, True, WHITE)
+            self.screen.blit(name_surface, (input_box.x + 10, input_box.y + 10))
+            
+            # Инструкции
+            hint = small_font.render("Press ENTER to submit, ESC to skip", True, GRAY)
+            hint_rect = hint.get_rect(center=(center_x, center_y + 60))
+            self.screen.blit(hint, hint_rect)
+            
+            pygame.display.flip()
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return None
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN and name:
+                        return name
+                    elif event.key == pygame.K_ESCAPE:
+                        return None
+                    elif event.key == pygame.K_BACKSPACE:
+                        name = name[:-1]
+                    elif len(name) < 15 and event.unicode.isprintable():
+                        name += event.unicode
+            
+            await asyncio.sleep(0)
+        
+        return name
+
     async def show_game_over(self):
+        # Сохраняем результат в таблицу лидеров
+        if self.mode == 'single' and self.snakes[0].score > 0:
+            # Запрашиваем имя игрока
+            name = await self.get_player_name()
+            if name:
+                add_score_to_leaderboard(name, self.snakes[0].score)
+        
         # Определяем победителя и причину
         winner = None
         win_text = None
@@ -1122,9 +1429,11 @@ async def main():
         color = last_result['color']
         controls_p1 = last_result.get('controls_p1')
         controls_p2 = last_result.get('controls_p2')
+        theme = menu.current_theme
+        settings = menu.settings
         while True:
             game = SnakeGame(delay, color, mode=mode, bot_color=BLUE, walls_type=walls, 
-                           controls_p1=controls_p1, controls_p2=controls_p2)
+                           controls_p1=controls_p1, controls_p2=controls_p2, theme=theme, settings=settings)
             game.screen = screen
             game_result = await game.run()
             if game_result == 'restart':
