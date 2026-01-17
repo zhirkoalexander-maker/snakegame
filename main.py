@@ -3,6 +3,7 @@ class Snake:
         self.body = [start_pos]
         self.direction = direction
         self.next_direction = direction  # Буфер для следующего направления
+        self.direction_changed = False  # Флаг для предотвращения множественных изменений
         self.color = color
         self.controls = controls or {}
         self.is_bot = is_bot
@@ -14,11 +15,12 @@ class Snake:
         return self.body[0]
 
     def set_direction(self, key):
-        if key in self.controls:
+        if key in self.controls and not self.direction_changed:
             new_dir = self.controls[key]
-            # Запретить разворот назад (используем next_direction для проверки)
-            if (new_dir[0] != -self.next_direction[0] or new_dir[1] != -self.next_direction[1]):
+            # Запретить разворот назад (проверяем против текущего direction)
+            if (new_dir[0] != -self.direction[0] or new_dir[1] != -self.direction[1]):
                 self.next_direction = new_dir
+                self.direction_changed = True
 
     def move(self, wrap_around=False, field_width=None, field_height=None):
         if field_width is None:
@@ -27,6 +29,7 @@ class Snake:
             field_height = 600  # HEIGHT
         # Применяем буферизованное направление
         self.direction = self.next_direction
+        self.direction_changed = False  # Сбрасываем флаг после применения
         head_x, head_y = self.body[0]
         dx, dy = self.direction
         new_head = (head_x + dx, head_y + dy)
@@ -45,9 +48,12 @@ class Snake:
 
     def check_collision(self, walls, snakes, walls_enabled=True, field_width=None, field_height=None, wrap_around=False):
         head = self.get_head()
-        # Серые стены убивают всегда
-        if walls_enabled and head in walls:
+        # Нормализуем координаты головы к сетке
+        head_grid = ((head[0] // CELL_SIZE) * CELL_SIZE, (head[1] // CELL_SIZE) * CELL_SIZE)
+        # Серые стены убивают только если walls_enabled=True
+        if walls_enabled and head_grid in walls:
             self.alive = False
+            return
         # Границы убивают только если wrap_around == False
         if not wrap_around:
             if field_width is None:
@@ -56,25 +62,67 @@ class Snake:
                 field_height = 600
             if head[0] < 0 or head[0] >= field_width or head[1] < 0 or head[1] >= field_height:
                 self.alive = False
+                return
+        # Проверка столкновения с собой
         if head in self.body[1:]:
             self.alive = False
+            return
+        # Проверка столкновения с другими змеями
         for snake in snakes:
             if snake is not self:
                 if head == snake.get_head():
                     self.alive = False
+                    return
                 elif head in snake.body[1:]:
                     self.alive = False
+                    return
 
     def draw(self, screen):
-        for segment in self.body:
+        for i, segment in enumerate(self.body):
             # Рисуем строго по сетке
             x = (segment[0] // CELL_SIZE) * CELL_SIZE
             y = (segment[1] // CELL_SIZE) * CELL_SIZE
-            pygame.draw.rect(screen, self.color, (x, y, CELL_SIZE, CELL_SIZE))
+            
+            # Сужение к концу хвоста
+            body_length = len(self.body)
+            scale_factor = 1.0 - (i / body_length) * 0.5  # От 1.0 до 0.5
+            segment_size = int(CELL_SIZE * scale_factor)
+            offset = (CELL_SIZE - segment_size) // 2
+            
+            # Основной цвет с затемнением для тела
+            if i == 0:
+                # Голова - ярче
+                color = self.color
+                # Рисуем обводку
+                pygame.draw.rect(screen, (0, 0, 0), (x, y, CELL_SIZE, CELL_SIZE), 2)
+                # Основной прямоугольник
+                pygame.draw.rect(screen, color, (x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4))
+                # Блик
+                highlight_color = tuple(min(255, c + 60) for c in color)
+                pygame.draw.rect(screen, highlight_color, (x + 4, y + 4, CELL_SIZE // 3, CELL_SIZE // 3))
+                # Глаза
+                eye_color = (255, 255, 255)
+                pygame.draw.circle(screen, eye_color, (x + 6, y + 8), 3)
+                pygame.draw.circle(screen, eye_color, (x + CELL_SIZE - 6, y + 8), 3)
+                pygame.draw.circle(screen, (0, 0, 0), (x + 6, y + 8), 1)
+                pygame.draw.circle(screen, (0, 0, 0), (x + CELL_SIZE - 6, y + 8), 1)
+            else:
+                # Тело - темнее и сужается
+                color = tuple(max(0, c - 30) for c in self.color)
+                # Обводка
+                pygame.draw.rect(screen, (0, 0, 0), (x + offset, y + offset, segment_size, segment_size), 1)
+                # Основной прямоугольник со скругленными углами
+                pygame.draw.rect(screen, color, (x + offset + 1, y + offset + 1, segment_size - 2, segment_size - 2), border_radius=4)
+                # Небольшой блик (только если сегмент достаточно большой)
+                if segment_size > 10:
+                    highlight_color = tuple(min(255, c + 30) for c in color)
+                    highlight_size = max(2, segment_size // 4)
+                    pygame.draw.rect(screen, highlight_color, (x + offset + 3, y + offset + 3, highlight_size, highlight_size), border_radius=2)
 
 import pygame
 import random
 import os
+import asyncio
 
 # Настройки игры
 WIDTH = 600
@@ -107,10 +155,32 @@ class Menu:
         self.modes = ["Single", "PvP", "Bot"]
         self.walls_types = ["With walls", "No walls"]
         self.selected = 0
-        self.step = 'mode'  # 'mode', 'walls', 'level', 'color'
+        self.step = 'start'  # 'start', 'mode', 'walls', 'level', 'color', 'controls'
         self.selected_mode = 0
         self.selected_walls = 0
         self.selected_level = 0
+        # Фоновая игра для меню
+        self.background_game = None
+        self.bg_last_move = 0
+        # Настройки управления
+        self.default_controls_p1 = {
+            'up': pygame.K_UP,
+            'down': pygame.K_DOWN,
+            'left': pygame.K_LEFT,
+            'right': pygame.K_RIGHT,
+            'speedup': pygame.K_RSHIFT
+        }
+        self.default_controls_p2 = {
+            'up': pygame.K_w,
+            'down': pygame.K_s,
+            'left': pygame.K_a,
+            'right': pygame.K_d,
+            'speedup': pygame.K_LSHIFT
+        }
+        self.controls_p1 = self.default_controls_p1.copy()
+        self.controls_p2 = self.default_controls_p2.copy()
+        self.waiting_for_key = None  # ('p1', 'up'), ('p2', 'down'), etc.
+        self.fullscreen = False
 
     def draw(self):
         # Получаем текущий размер окна
@@ -118,34 +188,249 @@ class Menu:
         center_x = screen_rect.centerx
         center_y = screen_rect.centery
         self.screen.fill(BLACK)
-        if self.step == 'mode':
+        
+        # Отрисовываем фоновую игру
+        if self.background_game is None or not any(s.alive for s in self.background_game.snakes):
+            # Создаём новую фоновую игру с одним ботом
+            bg_game = SnakeGame(100, GREEN, mode='single', walls_type='No walls')
+            bg_game.screen = self.screen
+            # Делаем змею ботом
+            bg_game.snakes[0].is_bot = True
+            bg_game.snakes[0].controls = {}
+            self.background_game = bg_game
+            self.bg_last_move = pygame.time.get_ticks()
+        
+        # Обновляем фоновую игру
+        current_time = pygame.time.get_ticks()
+        if current_time - self.bg_last_move > 100:
+            self.background_game.move()
+            self.bg_last_move = current_time
+        
+        # Рисуем только змей и еду без UI (без score)
+        for snake in self.background_game.snakes:
+            if snake.alive:
+                snake.draw(self.screen)
+        
+        # Рисуем еду
+        fx, fy = self.background_game.food['pos']
+        if self.background_game.food['type'] == 'gold':
+            food_color = GOLD
+            darker_gold = (200, 170, 0)
+        else:
+            food_color = RED
+            darker_gold = (180, 0, 0)
+        
+        shadow_color = (50, 50, 50)
+        pygame.draw.circle(self.screen, shadow_color, (fx + CELL_SIZE // 2 + 2, fy + CELL_SIZE - 3), CELL_SIZE // 3)
+        pygame.draw.circle(self.screen, darker_gold, (fx + CELL_SIZE // 2 + 1, fy + CELL_SIZE // 2 + 1), CELL_SIZE // 2 - 2)
+        pygame.draw.circle(self.screen, food_color, (fx + CELL_SIZE // 2, fy + CELL_SIZE // 2), CELL_SIZE // 2 - 2)
+        pygame.draw.circle(self.screen, (0, 0, 0), (fx + CELL_SIZE // 2, fy + CELL_SIZE // 2), CELL_SIZE // 2 - 2, 2)
+        highlight_color = (255, 255, 255)
+        pygame.draw.circle(self.screen, highlight_color, (fx + CELL_SIZE // 2 - 3, fy + CELL_SIZE // 2 - 4), 4)
+        leaf_color = (0, 150, 0)
+        leaf_points = [
+            (fx + CELL_SIZE // 2, fy + 3),
+            (fx + CELL_SIZE // 2 + 5, fy),
+            (fx + CELL_SIZE // 2 + 3, fy + 6)
+        ]
+        pygame.draw.polygon(self.screen, leaf_color, leaf_points)
+        
+        # Затемняем фон
+        overlay = pygame.Surface((self.screen.get_width(), self.screen.get_height()))
+        overlay.set_alpha(200)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        # Сохраняем прямоугольники для кликабельных элементов
+        self.clickable_rects = []
+        if self.step == 'start':
+            # Начальный экран
+            # Рисуем декоративную змею над заголовком
+            snake_y = center_y - 150
+            snake_segments = [
+                (center_x - 120, snake_y),
+                (center_x - 90, snake_y),
+                (center_x - 60, snake_y - 20),
+                (center_x - 30, snake_y - 30),
+                (center_x, snake_y - 20),
+                (center_x + 30, snake_y - 30),
+                (center_x + 60, snake_y - 20),
+                (center_x + 90, snake_y),
+                (center_x + 120, snake_y)
+            ]
+            
+            # Рисуем тело змеи с градиентом
+            for i, pos in enumerate(snake_segments):
+                size = 28 - i * 2
+                color_val = 255 - i * 20
+                segment_color = (0, max(100, color_val), 0)
+                pygame.draw.circle(self.screen, (0, 0, 0), pos, size // 2 + 2)  # Обводка
+                pygame.draw.circle(self.screen, segment_color, pos, size // 2)
+                # Блик
+                pygame.draw.circle(self.screen, (150, 255, 150), (pos[0] - 3, pos[1] - 3), size // 6)
+            
+            # Голова змеи
+            head_pos = snake_segments[0]
+            pygame.draw.circle(self.screen, (0, 0, 0), head_pos, 16)
+            pygame.draw.circle(self.screen, GREEN, head_pos, 14)
+            # Глаза
+            pygame.draw.circle(self.screen, (255, 255, 255), (head_pos[0] - 5, head_pos[1] - 3), 4)
+            pygame.draw.circle(self.screen, (255, 255, 255), (head_pos[0] + 5, head_pos[1] - 3), 4)
+            pygame.draw.circle(self.screen, (0, 0, 0), (head_pos[0] - 5, head_pos[1] - 3), 2)
+            pygame.draw.circle(self.screen, (0, 0, 0), (head_pos[0] + 5, head_pos[1] - 3), 2)
+            # Язык
+            tongue_points = [
+                (head_pos[0] - 15, head_pos[1] + 5),
+                (head_pos[0] - 20, head_pos[1] + 3),
+                (head_pos[0] - 18, head_pos[1] + 5),
+                (head_pos[0] - 22, head_pos[1] + 7)
+            ]
+            pygame.draw.lines(self.screen, RED, False, tongue_points, 2)
+            
+            # Заголовок с эффектом тени
+            title_font = pygame.font.SysFont(None, 72)
+            # Тень
+            title_shadow = title_font.render("SUPER SNAKE GAME", True, (0, 100, 0))
+            shadow_rect = title_shadow.get_rect(center=(center_x + 3, center_y - 77))
+            self.screen.blit(title_shadow, shadow_rect)
+            # Основной текст
+            title = title_font.render("SUPER SNAKE GAME", True, GREEN)
+            title_rect = title.get_rect(center=(center_x, center_y - 80))
+            self.screen.blit(title, title_rect)
+            
+            # Декоративные яблоки в углах
+            apple_positions = [
+                (center_x - 250, center_y - 200),
+                (center_x + 250, center_y - 200),
+                (center_x - 250, center_y + 150),
+                (center_x + 250, center_y + 150)
+            ]
+            for apple_pos in apple_positions:
+                # Тень
+                pygame.draw.circle(self.screen, (50, 0, 0), (apple_pos[0] + 2, apple_pos[1] + 2), 12)
+                # Яблоко
+                pygame.draw.circle(self.screen, (180, 0, 0), (apple_pos[0], apple_pos[1]), 12)
+                pygame.draw.circle(self.screen, RED, (apple_pos[0], apple_pos[1]), 10)
+                # Блик
+                pygame.draw.circle(self.screen, (255, 200, 200), (apple_pos[0] - 3, apple_pos[1] - 3), 3)
+                # Листик
+                leaf = [
+                    (apple_pos[0], apple_pos[1] - 10),
+                    (apple_pos[0] + 4, apple_pos[1] - 12),
+                    (apple_pos[0] + 2, apple_pos[1] - 8)
+                ]
+                pygame.draw.polygon(self.screen, (0, 150, 0), leaf)
+            
+            # Кнопка Start
+            start_button = pygame.Rect(center_x - 100, center_y + 20, 200, 60)
+            pygame.draw.rect(self.screen, GREEN, start_button)
+            start_text = self.font.render("Start", True, BLACK)
+            start_text_rect = start_text.get_rect(center=start_button.center)
+            self.screen.blit(start_text, start_text_rect)
+            self.clickable_rects.append(('start', start_button))
+            
+            # Кнопка Exit
+            exit_button = pygame.Rect(center_x - 100, center_y + 90, 200, 50)
+            pygame.draw.rect(self.screen, RED, exit_button)
+            exit_text = self.small_font.render("Exit", True, BLACK)
+            exit_text_rect = exit_text.get_rect(center=exit_button.center)
+            self.screen.blit(exit_text, exit_text_rect)
+            self.clickable_rects.append(('exit', exit_button))
+            
+            # Подзаголовок
+            subtitle_font = pygame.font.SysFont(None, 28)
+            subtitle = subtitle_font.render("Press ENTER to start", True, WHITE)
+            subtitle_rect = subtitle.get_rect(center=(center_x, center_y + 155))
+            self.screen.blit(subtitle, subtitle_rect)
+            
+            # Кнопка настроек
+            settings_text = subtitle_font.render("Press C to configure controls", True, GRAY)
+            settings_rect = settings_text.get_rect(center=(center_x, center_y + 185))
+            self.screen.blit(settings_text, settings_rect)
+        elif self.step == 'mode':
             title = self.font.render("Choose Game Mode", True, WHITE)
             self.screen.blit(title, (center_x - 170, center_y - 100))
             for i, mode in enumerate(self.modes):
                 color = GREEN if i == self.selected else WHITE
                 text = self.small_font.render(f"{i+1}. {mode}", True, color)
+                text_rect = pygame.Rect(center_x - 100, center_y - 50 + i * 40, 200, 35)
                 self.screen.blit(text, (center_x - 80, center_y - 50 + i * 40))
+                self.clickable_rects.append(('mode', i, text_rect))
         elif self.step == 'walls':
             title = self.font.render("Choose Walls", True, WHITE)
             self.screen.blit(title, (center_x - 120, center_y - 100))
             for i, wtype in enumerate(self.walls_types):
                 color = GREEN if i == self.selected else WHITE
                 text = self.small_font.render(f"{i+1}. {wtype}", True, color)
+                text_rect = pygame.Rect(center_x - 100, center_y - 50 + i * 40, 200, 35)
                 self.screen.blit(text, (center_x - 80, center_y - 50 + i * 40))
+                self.clickable_rects.append(('walls', i, text_rect))
         elif self.step == 'level':
             title = self.font.render("Choose Level", True, WHITE)
             self.screen.blit(title, (center_x - 120, center_y - 100))
             for i, level in enumerate(self.levels):
                 color = GREEN if i == self.selected else WHITE
                 text = self.small_font.render(f"{i+1}. {level['name']}", True, color)
+                text_rect = pygame.Rect(center_x - 100, center_y - 50 + i * 40, 200, 35)
                 self.screen.blit(text, (center_x - 80, center_y - 50 + i * 40))
+                self.clickable_rects.append(('level', i, text_rect))
         elif self.step == 'color':
             title = self.font.render("Choose Snake Color", True, WHITE)
             self.screen.blit(title, (center_x - 150, center_y - 100))
             for i, color_name in enumerate(self.color_names):
                 color = GREEN if i == self.selected else WHITE
                 text = self.small_font.render(f"{i+1}. {color_name}", True, color)
+                text_rect = pygame.Rect(center_x - 100, center_y - 50 + i * 40, 200, 35)
                 self.screen.blit(text, (center_x - 80, center_y - 50 + i * 40))
+                self.clickable_rects.append(('color', i, text_rect))
+        elif self.step == 'controls':
+            title = self.font.render("Configure Controls", True, WHITE)
+            title_rect = title.get_rect(center=(center_x, center_y - 200))
+            self.screen.blit(title, title_rect)
+            
+            # Player 1 controls
+            p1_title = self.small_font.render("Player 1:", True, GREEN)
+            self.screen.blit(p1_title, (center_x - 250, center_y - 140))
+            
+            directions = [('up', 'Up'), ('down', 'Down'), ('left', 'Left'), ('right', 'Right'), ('speedup', 'Speedup')]
+            for idx, (dir_key, dir_name) in enumerate(directions):
+                key_name = pygame.key.name(self.controls_p1[dir_key])
+                color = RED if self.waiting_for_key == ('p1', dir_key) else WHITE
+                text = self.small_font.render(f"{dir_name}: {key_name}", True, color)
+                button_rect = pygame.Rect(center_x - 250, center_y - 100 + idx * 35, 200, 30)
+                pygame.draw.rect(self.screen, GRAY, button_rect, 2)
+                self.screen.blit(text, (center_x - 240, center_y - 95 + idx * 35))
+                self.clickable_rects.append(('control', 'p1', dir_key, button_rect))
+            
+            # Player 2 controls
+            p2_title = self.small_font.render("Player 2:", True, BLUE)
+            self.screen.blit(p2_title, (center_x + 50, center_y - 140))
+            
+            for idx, (dir_key, dir_name) in enumerate(directions):
+                key_name = pygame.key.name(self.controls_p2[dir_key])
+                color = RED if self.waiting_for_key == ('p2', dir_key) else WHITE
+                text = self.small_font.render(f"{dir_name}: {key_name}", True, color)
+                button_rect = pygame.Rect(center_x + 50, center_y - 100 + idx * 35, 200, 30)
+                pygame.draw.rect(self.screen, GRAY, button_rect, 2)
+                self.screen.blit(text, (center_x + 60, center_y - 95 + idx * 35))
+                self.clickable_rects.append(('control', 'p2', dir_key, button_rect))
+            
+            # Инструкции
+            inst_font = pygame.font.SysFont(None, 28)
+            if self.waiting_for_key:
+                inst_text = inst_font.render("Press any key to assign...", True, GOLD)
+            else:
+                inst_text = inst_font.render("Click on a control to change it", True, WHITE)
+            inst_rect = inst_text.get_rect(center=(center_x, center_y + 90))
+            self.screen.blit(inst_text, inst_rect)
+            
+            reset_text = inst_font.render("Press R to reset to defaults", True, GRAY)
+            reset_rect = reset_text.get_rect(center=(center_x, center_y + 120))
+            self.screen.blit(reset_text, reset_rect)
+            
+            back_text = inst_font.render("Press ESC or BACKSPACE to go back", True, GRAY)
+            back_rect = back_text.get_rect(center=(center_x, center_y + 150))
+            self.screen.blit(back_text, back_rect)
         # Кнопки увеличения/уменьшения размера окна (зум)
         button_font = pygame.font.SysFont(None, 28)
         plus_rect = pygame.Rect(self.screen.get_width() - 90, 10, 35, 35)
@@ -170,14 +455,88 @@ class Menu:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Обработка кликов по всем кликабельным элементам
+                for item in self.clickable_rects:
+                    if item[0] == 'start':
+                        if item[1].collidepoint(event.pos):
+                            self.step = 'mode'
+                            self.selected = 0
+                            return 'next'
+                    elif item[0] == 'exit':
+                        if item[1].collidepoint(event.pos):
+                            return None
+                    elif item[0] == 'mode':
+                        if item[2].collidepoint(event.pos):
+                            self.selected_mode = item[1]
+                            self.step = 'walls'
+                            self.selected = 0
+                            return 'next'
+                    elif item[0] == 'walls':
+                        if item[2].collidepoint(event.pos):
+                            self.selected_walls = item[1]
+                            self.step = 'level'
+                            self.selected = 0
+                            return 'next'
+                    elif item[0] == 'level':
+                        if item[2].collidepoint(event.pos):
+                            self.selected_level = item[1]
+                            self.step = 'color'
+                            self.selected = 0
+                            return 'next'
+                    elif item[0] == 'color':
+                        if item[2].collidepoint(event.pos):
+                            return {
+                                'mode': self.modes[self.selected_mode],
+                                'walls': self.walls_types[self.selected_walls],
+                                'delay': self.levels[self.selected_level]['delay'],
+                                'color': self.colors[item[1]],
+                                'controls_p1': self.controls_p1,
+                                'controls_p2': self.controls_p2
+                            }
+                    elif item[0] == 'control':
+                        if item[3].collidepoint(event.pos):
+                            # Клик на кнопку настройки клавиши
+                            player, direction = item[1], item[2]
+                            self.waiting_for_key = (player, direction)
+                            return 'waiting'
             elif event.type == pygame.KEYDOWN:
+                # Обработка ввода клавиши в меню настроек
+                if self.waiting_for_key is not None:
+                    player, direction = self.waiting_for_key
+                    if player == 'p1':
+                        self.controls_p1[direction] = event.key
+                    else:
+                        self.controls_p2[direction] = event.key
+                    self.waiting_for_key = None
+                    return 'key_set'
+                if self.step == 'controls':
+                    if event.key == pygame.K_BACKSPACE or event.key == pygame.K_ESCAPE:
+                        self.step = 'start'
+                        return 'back'
+                    elif event.key == pygame.K_r:
+                        # Сброс к дефолтным настройкам
+                        self.controls_p1 = self.default_controls_p1.copy()
+                        self.controls_p2 = self.default_controls_p2.copy()
+                        return 'reset'
                 if event.key == pygame.K_f:
                     self.fullscreen = not self.fullscreen
                     if self.fullscreen:
                         pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
                     else:
                         pygame.display.set_mode((WIDTH, HEIGHT))
-                if self.step == 'mode':
+                if self.step == 'start':
+                    # На начальном экране Enter = Start
+                    if event.key == pygame.K_RETURN:
+                        self.step = 'mode'
+                        self.selected = 0
+                        return 'next'
+                    elif event.key == pygame.K_c:
+                        # Открыть меню настройки управления
+                        self.step = 'controls'
+                        self.selected = 0
+                        return 'controls'
+                elif self.step == 'mode':
                     if event.key == pygame.K_UP:
                         self.selected = (self.selected - 1) % len(self.modes)
                     elif event.key == pygame.K_DOWN:
@@ -225,7 +584,9 @@ class Menu:
                             'mode': self.modes[self.selected_mode],
                             'walls': self.walls_types[self.selected_walls],
                             'delay': self.levels[self.selected_level]['delay'],
-                            'color': self.colors[self.selected]
+                            'color': self.colors[self.selected],
+                            'controls_p1': self.controls_p1,
+                            'controls_p2': self.controls_p2
                         }
                     elif event.key == pygame.K_BACKSPACE:
                         self.step = 'level'
@@ -233,8 +594,8 @@ class Menu:
                         return 'back'
         return -1
 
-    def run(self):
-        self.step = 'mode'
+    async def run(self):
+        self.step = 'start'
         self.selected = 0
         self.selected_mode = 0
         self.selected_walls = 0
@@ -248,12 +609,12 @@ class Menu:
             result = self.handle_events()
             if result is None:
                 return None
-            elif result == 'next':
-                continue
-            elif result == 'back':
+            elif result in ['next', 'back', 'controls', 'waiting', 'key_set', 'reset']:
+                await asyncio.sleep(0)
                 continue
             elif isinstance(result, dict):
                 return result
+            await asyncio.sleep(0)
 
 class SnakeGame:
     def handle_zoom(self):
@@ -287,7 +648,7 @@ class SnakeGame:
                     if (x, y) not in forbidden and x != 0 and y != 0 and x != (screen_w-1)*CELL_SIZE and y != (screen_h-1)*CELL_SIZE:
                         self.walls.append((x, y))
                         break
-    def __init__(self, move_delay, snake_color, mode='single', bot_color=BLUE, walls_type="Frame walls"):
+    def __init__(self, move_delay, snake_color, mode='single', bot_color=BLUE, walls_type="Frame walls", controls_p1=None, controls_p2=None):
         # Запретить совпадение цветов змеи и бота
         if bot_color == snake_color:
             alt_colors = [c for c in [GREEN, BLUE, RED, (255,255,0), (255,0,255), (0,255,255)] if c != snake_color]
@@ -326,28 +687,57 @@ class SnakeGame:
                         break
         # Игроки
         self.snakes = []
-        if mode == 'single':
-            controls = {
-                pygame.K_UP: (0, -CELL_SIZE), pygame.K_DOWN: (0, CELL_SIZE),
-                pygame.K_LEFT: (-CELL_SIZE, 0), pygame.K_RIGHT: (CELL_SIZE, 0),
-                pygame.K_w: (0, -CELL_SIZE), pygame.K_s: (0, CELL_SIZE),
-                pygame.K_a: (-CELL_SIZE, 0), pygame.K_d: (CELL_SIZE, 0)
+        # Создаем словарь управления из настроек
+        if controls_p1 is None:
+            controls_p1 = {
+                'up': pygame.K_UP,
+                'down': pygame.K_DOWN,
+                'left': pygame.K_LEFT,
+                'right': pygame.K_RIGHT,
+                'speedup': pygame.K_RSHIFT
             }
+        if controls_p2 is None:
+            controls_p2 = {
+                'up': pygame.K_w,
+                'down': pygame.K_s,
+                'left': pygame.K_a,
+                'right': pygame.K_d,
+                'speedup': pygame.K_LSHIFT
+            }
+        
+        # Сохраняем клавиши ускорения
+        self.speedup_keys = [controls_p1.get('speedup', pygame.K_RSHIFT), 
+                            controls_p2.get('speedup', pygame.K_LSHIFT)]
+        
+        # Конвертируем в формат для Snake
+        p1_controls = {
+            controls_p1['up']: (0, -CELL_SIZE),
+            controls_p1['down']: (0, CELL_SIZE),
+            controls_p1['left']: (-CELL_SIZE, 0),
+            controls_p1['right']: (CELL_SIZE, 0)
+        }
+        p2_controls = {
+            controls_p2['up']: (0, -CELL_SIZE),
+            controls_p2['down']: (0, CELL_SIZE),
+            controls_p2['left']: (-CELL_SIZE, 0),
+            controls_p2['right']: (CELL_SIZE, 0)
+        }
+        
+        if mode == 'single':
+            # Объединяем оба набора для одиночной игры
+            controls = {**p1_controls, **p2_controls}
             self.snakes.append(Snake((WIDTH // 2, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls=controls))
         elif mode == 'pvp':
-            self.snakes.append(Snake((WIDTH // 4, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls={pygame.K_w:(0,-CELL_SIZE),pygame.K_s:(0,CELL_SIZE),pygame.K_a:(-CELL_SIZE,0),pygame.K_d:(CELL_SIZE,0)}))
-            self.snakes.append(Snake((3*WIDTH // 4, HEIGHT // 2), (-CELL_SIZE, 0), self.bot_color, controls={pygame.K_UP:(0,-CELL_SIZE),pygame.K_DOWN:(0,CELL_SIZE),pygame.K_LEFT:(-CELL_SIZE,0),pygame.K_RIGHT:(CELL_SIZE,0)}))
+            self.snakes.append(Snake((WIDTH // 4, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls=p2_controls))
+            self.snakes.append(Snake((3*WIDTH // 4, HEIGHT // 2), (-CELL_SIZE, 0), self.bot_color, controls=p1_controls))
         elif mode == 'bot':
-            controls = {
-                pygame.K_UP: (0, -CELL_SIZE), pygame.K_DOWN: (0, CELL_SIZE),
-                pygame.K_LEFT: (-CELL_SIZE, 0), pygame.K_RIGHT: (CELL_SIZE, 0),
-                pygame.K_w: (0, -CELL_SIZE), pygame.K_s: (0, CELL_SIZE),
-                pygame.K_a: (-CELL_SIZE, 0), pygame.K_d: (CELL_SIZE, 0)
-            }
+            # Объединяем оба набора для режима с ботом
+            controls = {**p1_controls, **p2_controls}
             self.snakes.append(Snake((WIDTH // 4, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls=controls))
             self.snakes.append(Snake((3*WIDTH // 4, HEIGHT // 2), (-CELL_SIZE, 0), self.bot_color, is_bot=True))
         self.food = self.random_food()
         self.game_over = False
+        self.game_started = True
         self.last_move_time = 0
         self.walls_type = walls_type
 
@@ -372,6 +762,10 @@ class SnakeGame:
             if event.type == pygame.QUIT:
                 self.game_over = True
             elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    # Возврат в меню
+                    self.game_started = False
+                    return
                 for snake in self.snakes:
                     if not snake.is_bot:
                         snake.set_direction(event.key)
@@ -381,8 +775,8 @@ class SnakeGame:
         # Размер поля всегда равен размеру окна
         field_width = self.screen.get_width()
         field_height = self.screen.get_height()
-        # Серые стены убивают всегда
-        walls_enabled = len(self.walls) > 0
+        # Серые стены убивают только в режиме "With walls"
+        walls_enabled = (self.walls_type == 'With walls')
         # wrap_around только если нет стен (границ)
         wrap_around = (self.walls_type == 'No walls')
         # Бот управляет собой
@@ -455,15 +849,60 @@ class SnakeGame:
                 self.handle_zoom()
         # Рисуем стены
         for wall in self.walls:
-            pygame.draw.rect(self.screen, GRAY, (wall[0], wall[1], CELL_SIZE, CELL_SIZE))
+            # Основной цвет стены
+            wall_color = (100, 100, 100)
+            darker_gray = (70, 70, 70)
+            lighter_gray = (130, 130, 130)
+            
+            # Основной квадрат
+            pygame.draw.rect(self.screen, wall_color, (wall[0], wall[1], CELL_SIZE, CELL_SIZE))
+            # Темная обводка
+            pygame.draw.rect(self.screen, darker_gray, (wall[0], wall[1], CELL_SIZE, CELL_SIZE), 2)
+            # Светлые линии (кирпичный эффект)
+            pygame.draw.line(self.screen, lighter_gray, (wall[0], wall[1] + CELL_SIZE // 2), (wall[0] + CELL_SIZE, wall[1] + CELL_SIZE // 2), 1)
+            pygame.draw.line(self.screen, lighter_gray, (wall[0] + CELL_SIZE // 2, wall[1]), (wall[0] + CELL_SIZE // 2, wall[1] + CELL_SIZE), 1)
+            # Диагональные линии для текстуры
+            pygame.draw.line(self.screen, darker_gray, (wall[0] + 2, wall[1] + 2), (wall[0] + 6, wall[1] + 6), 1)
+            pygame.draw.line(self.screen, darker_gray, (wall[0] + CELL_SIZE - 6, wall[1] + 2), (wall[0] + CELL_SIZE - 2, wall[1] + 6), 1)
         # Рисуем змей
         for snake in self.snakes:
             snake.draw(self.screen)
-        # Рисуем еду
+        # Рисуем еду (красивое яблоко)
         fx = (self.food['pos'][0] // CELL_SIZE) * CELL_SIZE
         fy = (self.food['pos'][1] // CELL_SIZE) * CELL_SIZE
-        food_color = GOLD if self.food['type'] == 'gold' else RED
-        pygame.draw.rect(self.screen, food_color, (fx, fy, CELL_SIZE, CELL_SIZE))
+        
+        if self.food['type'] == 'gold':
+            # Золотое яблоко
+            food_color = GOLD
+            darker_gold = (200, 170, 0)
+        else:
+            # Красное яблоко
+            food_color = RED
+            darker_gold = (180, 0, 0)
+        
+        # Тень
+        shadow_color = (50, 50, 50)
+        pygame.draw.circle(self.screen, shadow_color, (fx + CELL_SIZE // 2 + 2, fy + CELL_SIZE - 3), CELL_SIZE // 3)
+        
+        # Основное яблоко (круг) с градиентом
+        pygame.draw.circle(self.screen, darker_gold, (fx + CELL_SIZE // 2 + 1, fy + CELL_SIZE // 2 + 1), CELL_SIZE // 2 - 2)
+        pygame.draw.circle(self.screen, food_color, (fx + CELL_SIZE // 2, fy + CELL_SIZE // 2), CELL_SIZE // 2 - 2)
+        
+        # Темная обводка
+        pygame.draw.circle(self.screen, (0, 0, 0), (fx + CELL_SIZE // 2, fy + CELL_SIZE // 2), CELL_SIZE // 2 - 2, 2)
+        
+        # Блик
+        highlight_color = (255, 255, 255)
+        pygame.draw.circle(self.screen, highlight_color, (fx + CELL_SIZE // 2 - 3, fy + CELL_SIZE // 2 - 4), 4)
+        
+        # Листик
+        leaf_color = (0, 150, 0)
+        leaf_points = [
+            (fx + CELL_SIZE // 2, fy + 3),
+            (fx + CELL_SIZE // 2 + 5, fy),
+            (fx + CELL_SIZE // 2 + 3, fy + 6)
+        ]
+        pygame.draw.polygon(self.screen, leaf_color, leaf_points)
         font = pygame.font.SysFont(None, 36)
         for i, snake in enumerate(self.snakes):
             text = font.render(f"P{i+1} Score: {snake.score}", True, snake.color)
@@ -471,7 +910,7 @@ class SnakeGame:
         pygame.display.flip()
 
     def bot_move(self, snake):
-        # Бот: идёт к еде, иногда пытается подрезать игрока
+        # Бот: идёт к еде, умеет обходить стены
         head = snake.get_head()
         fx, fy = self.food['pos']
         player = self.snakes[0]
@@ -483,27 +922,54 @@ class SnakeGame:
         min_dist = float('inf')
         # 20% шанс попытаться подрезать игрока
         import random
-        if random.random() < 0.2:
+        if random.random() < 0.2 and player.alive:
             target = (px, py)
         else:
             target = (fx, fy)
+        
+        # Нормализуем координаты стен к сетке
+        walls_grid = set()
+        for wall in self.walls:
+            wall_grid = ((wall[0] // CELL_SIZE) * CELL_SIZE, (wall[1] // CELL_SIZE) * CELL_SIZE)
+            walls_grid.add(wall_grid)
+        
+        # Оцениваем каждое направление
+        valid_moves = []
         for d in options:
             nx, ny = head[0] + d[0], head[1] + d[1]
-            pos = (nx, ny)
-            if pos in self.walls:
+            pos_grid = ((nx // CELL_SIZE) * CELL_SIZE, (ny // CELL_SIZE) * CELL_SIZE)
+            
+            # Проверка разворота на 180 градусов
+            if (d[0] == -snake.direction[0] and d[1] == -snake.direction[1]):
                 continue
-            # Не врезаться в себя
-            if pos in snake.body:
+            
+            # Проверка стены
+            if pos_grid in walls_grid:
                 continue
+            
+            # Проверка столкновения с собой
+            if (nx, ny) in snake.body:
+                continue
+                
+            # Проверка границ (если есть)
+            field_width = self.screen.get_width()
+            field_height = self.screen.get_height()
+            if self.walls_type != 'No walls':
+                if nx < 0 or nx >= field_width or ny < 0 or ny >= field_height:
+                    continue
+            
+            # Рассчитываем расстояние до цели
             dist = abs(target[0] - nx) + abs(target[1] - ny)
-            if dist < min_dist:
-                min_dist = dist
-                best = d
-        snake.direction = best
-        # Удаляем отладочный print для бота
-        # print(f"BOT DEBUG: alive={snake.alive}, score={snake.score}, head={snake.get_head()}, body={snake.body}")
+            valid_moves.append((d, dist))
+        
+        # Выбираем лучший ход из валидных
+        if valid_moves:
+            valid_moves.sort(key=lambda x: x[1])
+            best = valid_moves[0][0]
+        
+        snake.next_direction = best
 
-    def show_game_over(self):
+    async def show_game_over(self):
         # Определяем победителя и причину
         winner = None
         win_text = None
@@ -522,20 +988,20 @@ class SnakeGame:
         elif self.mode == "bot":
             if self.snakes[0].alive and not self.snakes[1].alive:
                 winner = 0
-                win_text = "YOU WIN"
+                win_text = "PLAYER 1 WINS"
                 win_color = self.snakes[0].color
             elif self.snakes[1].alive and not self.snakes[0].alive:
                 winner = 1
-                win_text = "YOU LOSE"
+                win_text = "BOT WINS"
                 win_color = self.snakes[1].color
             elif not self.snakes[0].alive and not self.snakes[1].alive:
                 if self.snakes[0].score > self.snakes[1].score:
                     winner = 0
-                    win_text = "YOU WIN"
+                    win_text = "PLAYER 1 WINS"
                     win_color = self.snakes[0].color
                 elif self.snakes[1].score > self.snakes[0].score:
                     winner = 1
-                    win_text = "YOU LOSE"
+                    win_text = "BOT WINS"
                     win_color = self.snakes[1].color
                 else:
                     winner = None
@@ -544,11 +1010,11 @@ class SnakeGame:
         elif self.mode == "pvp":
             if scores[0] > scores[1]:
                 winner = 0
-                win_text = "YOU WIN"
+                win_text = "PLAYER 1 WINS"
                 win_color = self.snakes[0].color
             elif scores[1] > scores[0]:
                 winner = 1
-                win_text = "YOU WIN"
+                win_text = "PLAYER 2 WINS"
                 win_color = self.snakes[1].color
             else:
                 winner = None
@@ -556,34 +1022,40 @@ class SnakeGame:
                 win_color = WHITE
 
         button_font = pygame.font.SysFont(None, 36)
-        buttons = [
-            {"text": "Restart", "rect": pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 + 20, 200, 50), "action": 'restart'},
-            {"text": "Menu", "rect": pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 + 80, 200, 50), "action": 'menu'},
-            {"text": "Quit", "rect": pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 + 140, 200, 50), "action": None}
-        ]
-
+        
         while True:
             self.screen.fill(BLACK)
+            # Получаем текущие размеры окна для центрирования
+            screen_w = self.screen.get_width()
+            screen_h = self.screen.get_height()
+            center_x = screen_w // 2
+            center_y = screen_h // 2
+            
+            # Создаём кнопки с учётом текущего размера окна
+            buttons = [
+                {"text": "Restart", "rect": pygame.Rect(center_x - 100, center_y + 20, 200, 50), "action": 'restart'},
+                {"text": "Menu", "rect": pygame.Rect(center_x - 100, center_y + 80, 200, 50), "action": 'menu'},
+                {"text": "Quit", "rect": pygame.Rect(center_x - 100, center_y + 140, 200, 50), "action": None}
+            ]
+            
             font = pygame.font.SysFont(None, 48)
-            # Крупно и по центру — YOU WIN/LOSE/DRAW
+            # Крупно и по центру — PLAYER WINS/LOSE/DRAW
             if win_text is not None:
                 big_font = pygame.font.SysFont(None, 96)
                 text = big_font.render(win_text, True, win_color)
-                text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 120))
+                text_rect = text.get_rect(center=(center_x, center_y - 120))
                 self.screen.blit(text, text_rect)
             # Выводим счет всех змей
             score_font = pygame.font.SysFont(None, 36)
+            y_offset = center_y - 40
             for i, snake in enumerate(self.snakes):
-                score_text = score_font.render(f"P{i+1} Score: {snake.score}", True, snake.color)
-                self.screen.blit(score_text, (WIDTH // 2 - 100, HEIGHT // 2 - 40 + i * 30))
-            # Для PvP — показать цвет победителя
-            if self.mode == "pvp" and winner is not None:
-                winner_text = score_font.render(f"Winner: Player {winner+1}", True, self.snakes[winner].color)
-                self.screen.blit(winner_text, (WIDTH // 2 - 100, HEIGHT // 2 + 40 + len(self.snakes)*30))
-            # Для бота — показать счет победителя/проигравшего
-            if self.mode == "bot" and winner is not None:
-                score_text = score_font.render(f"Winner: {self.snakes[winner].score}  Loser: {self.snakes[1-winner].score}", True, win_color)
-                self.screen.blit(score_text, (WIDTH // 2 - 100, HEIGHT // 2 + 100 + len(self.snakes)*30))
+                if self.mode == "bot":
+                    label = "Player" if i == 0 else "Bot"
+                else:
+                    label = f"P{i+1}"
+                score_text = score_font.render(f"{label} Score: {snake.score}", True, snake.color)
+                score_rect = score_text.get_rect(center=(center_x, y_offset + i * 40))
+                self.screen.blit(score_text, score_rect)
 
             for button in buttons:
                 pygame.draw.rect(self.screen, GRAY, button["rect"])
@@ -601,27 +1073,34 @@ class SnakeGame:
                         for button in buttons:
                             if button["rect"].collidepoint(event.pos):
                                 return button["action"]
+            await asyncio.sleep(0)
             self.clock.tick(FPS)
 
-    def run(self):
+    async def run(self):
         while not self.game_over:
             current_time = pygame.time.get_ticks()
             self.handle_events()
-            # Ускорение змейки при удержании пробела
+            # Проверка на возврат в меню по Escape
+            if not self.game_started:
+                return 'menu'
+            # Ускорение змейки при удержании клавиш ускорения
             speedup = False
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_SPACE]:
-                speedup = True
+            for speedup_key in self.speedup_keys:
+                if keys[speedup_key]:
+                    speedup = True
+                    break
             delay = self.move_delay // 2 if speedup else self.move_delay
             if current_time - self.last_move_time > delay:
                 self.move()
                 self.last_move_time = current_time
             self.draw()
+            await asyncio.sleep(0)
             self.clock.tick(FPS)
 
-        return self.show_game_over()
+        return await self.show_game_over()
 
-def main():
+async def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     menu = Menu(screen)
@@ -629,7 +1108,7 @@ def main():
     last_result = None
     while True:
         if last_result is None:
-            result = menu.run()
+            result = await menu.run()
             if result is None:
                 break
             last_result = result
@@ -637,17 +1116,22 @@ def main():
         walls = last_result['walls']
         delay = last_result['delay']
         color = last_result['color']
+        controls_p1 = last_result.get('controls_p1')
+        controls_p2 = last_result.get('controls_p2')
         while True:
-            game = SnakeGame(delay, color, mode=mode, bot_color=BLUE, walls_type=walls)
+            game = SnakeGame(delay, color, mode=mode, bot_color=BLUE, walls_type=walls, 
+                           controls_p1=controls_p1, controls_p2=controls_p2)
             game.screen = screen
-            game_result = game.run()
+            game_result = await game.run()
             if game_result == 'restart':
+                await asyncio.sleep(0)
                 continue  # Перезапуск игры с теми же параметрами
             elif game_result == 'menu':
                 last_result = None  # Вернуться в меню выбора
                 break
             else:
                 return  # Выход из main
+        await asyncio.sleep(0)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
