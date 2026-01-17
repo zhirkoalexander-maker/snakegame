@@ -94,48 +94,39 @@
     </div>
 
     <script type="module">
-        import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.mjs";
-        
         const loading = document.getElementById('loading');
         
         async function main() {
             try {
-                loading.textContent = 'Initializing Python... ⏳';
+                loading.textContent = 'Initializing Python environment... ⏳';
                 
-                const pyodide = await loadPyodide({
-                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/",
-                    stdout: (text) => console.log(text),
-                    stderr: (text) => console.error(text)
+                // Загружаем Pygbag специально для Pygame
+                const pygbag_script = document.createElement('script');
+                pygbag_script.src = 'https://pygame-web.github.io/archives/0.9/pythons.js';
+                pygbag_script.type = 'module';
+                document.head.appendChild(pygbag_script);
+                
+                await new Promise(resolve => {
+                    pygbag_script.onload = resolve;
                 });
                 
-                loading.textContent = 'Loading Pygame... 🎮';
+                loading.textContent = 'Loading Pygame Web... 🎮';
                 
-                // Загружаем pygame
-                await pyodide.loadPackage(['pygame']);
-                
-                loading.textContent = 'Loading game code... 📥';
-                
-                // Загружаем main.py
-                const response = await fetch('main.py');
-                let code = await response.text();
+                // Ждем загрузки окружения
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 loading.textContent = 'Starting game... 🚀';
                 
-                // Настраиваем окружение для браузера
-                await pyodide.runPythonAsync(`
-import sys
-import os
-
-# Устанавливаем platform для браузера
-sys.platform = "emscripten"
-
-# Создаем фейковый модуль os для совместимости
-if not hasattr(os, 'environ'):
-    os.environ = {}
-                `);
+                // Загружаем и запускаем main.py
+                const response = await fetch('main.py');
+                const code = await response.text();
+                
+                // Создаем виртуальную файловую систему
+                const fs = await window.loadPyodide();
+                fs.FS.writeFile('/main.py', code);
                 
                 // Запускаем игру
-                await pyodide.runPythonAsync(code);
+                await fs.runPythonAsync('exec(open("/main.py").read())');
                 
                 loading.style.display = 'none';
                 
@@ -143,12 +134,12 @@ if not hasattr(os, 'environ'):
                 console.error('Error:', error);
                 loading.innerHTML = `
                     <div style="color: #ff4444;">
-                        <p>❌ Error loading game</p>
-                        <p style="font-size: 0.8em; margin-top: 10px;">${error.message}</p>
+                        <p>❌ Browser version coming soon!</p>
                         <p style="font-size: 0.9em; margin-top: 20px;">
-                            Try downloading the game for the best experience!
+                            Pygame web support is still experimental.<br>
+                            Please download the game for the full experience!
                         </p>
-                        <a href="index.html" style="color: #00ff00; text-decoration: underline;">
+                        <a href="index.html" style="color: #00ff00; text-decoration: underline; margin-top: 20px; display: inline-block;">
                             ← Back to main page
                         </a>
                     </div>
