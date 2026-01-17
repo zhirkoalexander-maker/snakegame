@@ -192,12 +192,12 @@ def save_leaderboard(leaderboard):
     except:
         pass
 
-def add_score_to_leaderboard(score, mode):
+def add_score_to_leaderboard(name, score):
     leaderboard = load_leaderboard()
     from datetime import datetime
     leaderboard.append({
+        'name': name,
         'score': score,
-        'mode': mode,
         'date': datetime.now().strftime('%Y-%m-%d %H:%M')
     })
     leaderboard.sort(key=lambda x: x['score'], reverse=True)
@@ -332,6 +332,13 @@ class Menu:
         overlay.set_alpha(200)
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
+        
+        # High Score в левом верхнем углу
+        score_font = pygame.font.SysFont(None, 36)
+        leaderboard = load_leaderboard()
+        high_score = leaderboard[0]['score'] if leaderboard else 0
+        high_score_text = score_font.render(f"High Score: {high_score}", True, GOLD)
+        self.screen.blit(high_score_text, (10, 10))
         
         # Сохраняем прямоугольники для кликабельных элементов
         self.clickable_rects = []
@@ -840,6 +847,11 @@ class SnakeGame:
                 (screen_w // 4 * CELL_SIZE, screen_h // 2 * CELL_SIZE),
                 (3 * screen_w // 4 * CELL_SIZE, screen_h // 2 * CELL_SIZE)
             ]
+            # Запрещаем стены в верхнем левом углу (где High Score и счета игроков)
+            for py in range(4):  # Первые 4 строки
+                for px in range(8):  # Первые 8 колонок
+                    forbidden.append((px * CELL_SIZE, py * CELL_SIZE))
+            
             for _ in range(wall_count):
                 while True:
                     x = random.randint(0, screen_w - 1) * CELL_SIZE
@@ -883,6 +895,11 @@ class SnakeGame:
                 (screen_w // 4 * CELL_SIZE, screen_h // 2 * CELL_SIZE),
                 (3 * screen_w // 4 * CELL_SIZE, screen_h // 2 * CELL_SIZE)
             ]
+            # Запрещаем стены в верхнем левом углу (где High Score и счета игроков)
+            for py in range(4):  # Первые 4 строки
+                for px in range(8):  # Первые 8 колонок
+                    forbidden.append((px * CELL_SIZE, py * CELL_SIZE))
+            
             for _ in range(wall_count):
                 while True:
                     x = random.randint(0, screen_w - 1) * CELL_SIZE
@@ -1214,60 +1231,10 @@ class SnakeGame:
         
         snake.next_direction = best
 
-    async def get_player_name(self):
-        """Запрашивает имя игрока для таблицы лидеров"""
-        name = ""
-        input_active = True
-        font = pygame.font.SysFont(None, 48)
-        small_font = pygame.font.SysFont(None, 32)
-        
-        while input_active:
-            self.screen.fill(BLACK)
-            center_x = self.screen.get_width() // 2
-            center_y = self.screen.get_height() // 2
-            
-            # Заголовок
-            title = font.render("Enter Your Name:", True, WHITE)
-            title_rect = title.get_rect(center=(center_x, center_y - 80))
-            self.screen.blit(title, title_rect)
-            
-            # Поле ввода
-            input_box = pygame.Rect(center_x - 150, center_y - 20, 300, 50)
-            pygame.draw.rect(self.screen, WHITE, input_box, 2)
-            name_surface = small_font.render(name, True, WHITE)
-            self.screen.blit(name_surface, (input_box.x + 10, input_box.y + 10))
-            
-            # Инструкции
-            hint = small_font.render("Press ENTER to submit, ESC to skip", True, GRAY)
-            hint_rect = hint.get_rect(center=(center_x, center_y + 60))
-            self.screen.blit(hint, hint_rect)
-            
-            pygame.display.flip()
-            
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    return None
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN and name:
-                        return name
-                    elif event.key == pygame.K_ESCAPE:
-                        return None
-                    elif event.key == pygame.K_BACKSPACE:
-                        name = name[:-1]
-                    elif len(name) < 15 and event.unicode.isprintable():
-                        name += event.unicode
-            
-            await asyncio.sleep(0)
-        
-        return name
-
     async def show_game_over(self):
         # Сохраняем результат в таблицу лидеров
         if self.mode == 'single' and self.snakes[0].score > 0:
-            # Запрашиваем имя игрока
-            name = await self.get_player_name()
-            if name:
-                add_score_to_leaderboard(name, self.snakes[0].score)
+            add_score_to_leaderboard('Player', self.snakes[0].score)
         
         # Определяем победителя и причину
         winner = None
