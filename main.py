@@ -149,11 +149,11 @@ PURPLE = (153, 0, 255)
 
 # Темы
 THEMES = {
-    'classic': {'bg': BLACK, 'grid': (20, 20, 20)},
-    'forest': {'bg': (13, 38, 13), 'grid': (26, 58, 26)},
-    'ocean': {'bg': (0, 26, 51), 'grid': (0, 51, 102)},
-    'neon': {'bg': (10, 10, 26), 'grid': (26, 0, 51)},
-    'sunset': {'bg': (51, 25, 0), 'grid': (76, 38, 0)}
+    'classic': {'background': BLACK, 'grid': (20, 20, 20)},
+    'forest': {'background': (13, 38, 13), 'grid': (26, 58, 26)},
+    'ocean': {'background': (0, 26, 51), 'grid': (0, 51, 102)},
+    'neon': {'background': (10, 10, 26), 'grid': (26, 0, 51)},
+    'sunset': {'background': (51, 25, 0), 'grid': (76, 38, 0)}
 }
 
 # Настройки
@@ -856,9 +856,12 @@ class SnakeGame:
         self.snake_color = snake_color
         self.mode = mode
         self.bot_color = bot_color
-        self.theme = theme
-        self.theme_colors = THEMES.get(theme, THEMES['classic'])
-        self.settings = settings or load_settings()
+        
+        # Инициализация темы и настроек
+        self.theme = theme if theme in THEMES else 'classic'
+        self.theme_colors = THEMES[self.theme]
+        self.settings = settings if settings else load_settings()
+        
         pygame.display.set_caption("Snake Game")
         self.clock = pygame.time.Clock()
         self.screen = None
