@@ -301,39 +301,73 @@
 
     <div id="game-container">
         <button id="close-game" onclick="closeGame()">✖ Close Game</button>
-        <div id="pygame_canvas">
-            <div class="loading">Loading game... Please wait ⏳</div>
+        <div id="pygame_canvas" style="width: 640px; height: 640px; margin: 0 auto;">
+            <canvas id="canvas" width="600" height="600" style="border-radius: 10px;"></canvas>
+            <div class="loading" id="loading-text">Loading game... Please wait ⏳</div>
         </div>
     </div>
 
-    <script src="https://pygame-web.github.io/archives/0.9/pythons.js" type="module"></script>
-    <script type="application/javascript">
-        function startGame() {
+    <script type="module">
+        let gameLoaded = false;
+        
+        window.startGame = async function() {
             document.getElementById('game-container').classList.add('active');
-            loadGame();
+            if (!gameLoaded) {
+                await loadGame();
+                gameLoaded = true;
+            }
         }
 
-        function closeGame() {
+        window.closeGame = function() {
             document.getElementById('game-container').classList.remove('active');
         }
 
         async function loadGame() {
+            const loadingText = document.getElementById('loading-text');
             try {
-                const pyodideWorker = new Worker('./pyodide-worker.js');
+                loadingText.textContent = 'Initializing Python environment... ⏳';
                 
-                pyodideWorker.onmessage = (event) => {
-                    if (event.data.type === 'ready') {
-                        document.querySelector('.loading').textContent = 'Game loaded! Starting...';
-                    } else if (event.data.type === 'error') {
-                        document.querySelector('.loading').textContent = 'Error: ' + event.data.message;
-                    }
-                };
+                // Загружаем Pyodide
+                const pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
+                });
                 
-                pyodideWorker.postMessage({ type: 'loadPygame' });
+                loadingText.textContent = 'Installing Pygame... 🎮';
+                
+                // Устанавливаем pygame
+                await pyodide.loadPackage(['pygame', 'micropip']);
+                
+                loadingText.textContent = 'Loading game code... 📥';
+                
+                // Загружаем main.py
+                const response = await fetch('main.py');
+                const code = await response.text();
+                
+                loadingText.textContent = 'Starting game... 🚀';
+                
+                // Запускаем игру
+                await pyodide.runPythonAsync(code);
+                
+                loadingText.style.display = 'none';
+                
             } catch (error) {
-                document.querySelector('.loading').textContent = 'Error loading game. Try downloading instead.';
+                console.error('Error loading game:', error);
+                loadingText.innerHTML = `
+                    <div style="color: #ff4444;">
+                        <p>❌ Unable to load game in browser</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">
+                            Pygame games have limited browser support.<br>
+                            Please download the game for the best experience!
+                        </p>
+                    </div>
+                `;
             }
         }
+        
+        // Загружаем Pyodide библиотеку
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+        document.head.appendChild(script);
     </script>
 </body>
 </html>
