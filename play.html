@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game - Play Online</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 {
+            font-size: 3em;
+            text-shadow: 0 0 30px rgba(0, 255, 0, 0.7);
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #333;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            border: 2px solid #00ff00;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            background: #444;
+            transform: scale(1.05);
+        }
+        #pygame_div {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+        canvas {
+            display: block;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+        .loading {
+            text-align: center;
+            color: #00ff00;
+            font-size: 1.5em;
+            padding: 100px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .controls-hint {
+            text-align: center;
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🐍 Snake Game 🐍</h1>
+        <a href="index.html" class="back-btn">← Back to Main</a>
+    </div>
+    
+    <div id="pygame_div">
+        <div class="loading" id="loading">
+            Loading game... Please wait ⏳
+        </div>
+    </div>
+    
+    <div class="controls-hint">
+        <p><strong>Controls:</strong> Arrow Keys (P1) • WASD (P2) • Shifts for Speed</p>
+    </div>
+
+    <script type="module">
+        import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.mjs";
+        
+        const loading = document.getElementById('loading');
+        
+        async function main() {
+            try {
+                loading.textContent = 'Initializing Python... ⏳';
+                
+                const pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/",
+                    stdout: (text) => console.log(text),
+                    stderr: (text) => console.error(text)
+                });
+                
+                loading.textContent = 'Loading Pygame... 🎮';
+                
+                // Загружаем pygame-ce (community edition для web)
+                await pyodide.loadPackage(['pygame-ce']);
+                
+                loading.textContent = 'Loading game code... 📥';
+                
+                // Загружаем main.py
+                const response = await fetch('main.py');
+                let code = await response.text();
+                
+                loading.textContent = 'Starting game... 🚀';
+                
+                // Настраиваем окружение для браузера
+                await pyodide.runPythonAsync(`
+import sys
+import os
+
+# Устанавливаем platform для браузера
+sys.platform = "emscripten"
+
+# Создаем фейковый модуль os для совместимости
+if not hasattr(os, 'environ'):
+    os.environ = {}
+                `);
+                
+                // Запускаем игру
+                await pyodide.runPythonAsync(code);
+                
+                loading.style.display = 'none';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                loading.innerHTML = `
+                    <div style="color: #ff4444;">
+                        <p>❌ Error loading game</p>
+                        <p style="font-size: 0.8em; margin-top: 10px;">${error.message}</p>
+                        <p style="font-size: 0.9em; margin-top: 20px;">
+                            Try downloading the game for the best experience!
+                        </p>
+                        <a href="index.html" style="color: #00ff00; text-decoration: underline;">
+                            ← Back to main page
+                        </a>
+                    </div>
+                `;
+            }
+        }
+        
+        main();
+    </script>
+</body>
+</html>
