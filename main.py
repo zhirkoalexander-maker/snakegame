@@ -123,6 +123,10 @@ import pygame
 import random
 import os
 import asyncio
+import sys
+
+# Проверяем, запущено ли в браузере
+RUNNING_IN_BROWSER = sys.platform == "emscripten"
 
 # Настройки игры
 WIDTH = 600
