@@ -1073,24 +1073,22 @@ class SnakeGame:
         for y in range(0, self.screen.get_height(), CELL_SIZE):
             pygame.draw.line(self.screen, grid_color, (0, y), (self.screen.get_width(), y))
         
-        # Кнопки увеличения/уменьшения размера окна (работают и в меню, и в игре)
-        button_font = pygame.font.SysFont(None, 28)
-        plus_rect = pygame.Rect(self.screen.get_width() - 90, 10, 35, 35)
-        minus_rect = pygame.Rect(self.screen.get_width() - 50, 10, 35, 35)
-        pygame.draw.rect(self.screen, GRAY, plus_rect)
-        pygame.draw.rect(self.screen, GRAY, minus_rect)
-        plus_text = button_font.render("+", True, BLACK)
-        minus_text = button_font.render("-", True, BLACK)
-        self.screen.blit(plus_text, plus_rect.move(10, 2))
-        self.screen.blit(minus_text, minus_rect.move(10, 2))
-        # Обработка кликов по кнопкам
-        for event in pygame.event.get(pygame.MOUSEBUTTONDOWN):
-            if plus_rect.collidepoint(event.pos):
-                pygame.display.set_mode((self.screen.get_width() + 100, self.screen.get_height() + 100), pygame.RESIZABLE)
-                self.handle_zoom()
-            elif minus_rect.collidepoint(event.pos):
-                pygame.display.set_mode((max(300, self.screen.get_width() - 100), max(300, self.screen.get_height() - 100)), pygame.RESIZABLE)
-                self.handle_zoom()
+        # High Score в левом верхнем углу
+        font = pygame.font.SysFont(None, 36)
+        leaderboard = load_leaderboard()
+        high_score = leaderboard[0]['score'] if leaderboard else 0
+        high_score_text = font.render(f"High Score: {high_score}", True, GOLD)
+        self.screen.blit(high_score_text, (10, 10))
+        
+        # Score текущих игроков
+        for i, snake in enumerate(self.snakes):
+            if self.mode == "bot":
+                label = "Player" if i == 0 else "Bot"
+            else:
+                label = f"P{i+1}"
+            text = font.render(f"{label}: {snake.score}", True, snake.color)
+            self.screen.blit(text, (10, 50 + i * 35))
+        
         # Рисуем стены
         for wall in self.walls:
             # Основной цвет стены
@@ -1108,9 +1106,11 @@ class SnakeGame:
             # Диагональные линии для текстуры
             pygame.draw.line(self.screen, darker_gray, (wall[0] + 2, wall[1] + 2), (wall[0] + 6, wall[1] + 6), 1)
             pygame.draw.line(self.screen, darker_gray, (wall[0] + CELL_SIZE - 6, wall[1] + 2), (wall[0] + CELL_SIZE - 2, wall[1] + 6), 1)
+        
         # Рисуем змей
         for snake in self.snakes:
             snake.draw(self.screen)
+        
         # Рисуем еду
         fx = (self.food['pos'][0] // CELL_SIZE) * CELL_SIZE
         fy = (self.food['pos'][1] // CELL_SIZE) * CELL_SIZE
@@ -1152,21 +1152,6 @@ class SnakeGame:
         ]
         pygame.draw.polygon(self.screen, leaf_color, leaf_points)
         
-        # High Score в левом верхнем углу
-        font = pygame.font.SysFont(None, 36)
-        leaderboard = load_leaderboard()
-        high_score = leaderboard[0]['score'] if leaderboard else 0
-        high_score_text = font.render(f"High Score: {high_score}", True, GOLD)
-        self.screen.blit(high_score_text, (10, 10))
-        
-        # Score текущих игроков
-        for i, snake in enumerate(self.snakes):
-            if self.mode == "bot":
-                label = "Player" if i == 0 else "Bot"
-            else:
-                label = f"P{i+1}"
-            text = font.render(f"{label}: {snake.score}", True, snake.color)
-            self.screen.blit(text, (10, 50 + i * 35))
         pygame.display.flip()
 
     def bot_move(self, snake):
