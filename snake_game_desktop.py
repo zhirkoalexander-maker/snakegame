@@ -10,6 +10,7 @@ class Snake:
         self.grow_pending = 0
         self.alive = True
         self.score = 0
+        self.bot_speedup = False  # Бот решает сам когда ускоряться
 
     def get_head(self):
         return self.body[0]
@@ -135,7 +136,7 @@ WIDTH = 600
 HEIGHT = 600
 CELL_SIZE = 20
 FPS = 60
-FOOD_TYPES = ['normal', 'gold', 'poison']
+FOOD_TYPES = ['normal', 'gold']
 
 # Цвета
 BLACK = (0, 0, 0)
@@ -149,11 +150,11 @@ PURPLE = (153, 0, 255)
 
 # Темы
 THEMES = {
-    'classic': {'background': BLACK, 'grid': (20, 20, 20)},
-    'forest': {'background': (13, 38, 13), 'grid': (26, 58, 26)},
-    'ocean': {'background': (0, 26, 51), 'grid': (0, 51, 102)},
-    'neon': {'background': (10, 10, 26), 'grid': (26, 0, 51)},
-    'sunset': {'background': (51, 25, 0), 'grid': (76, 38, 0)}
+    'classic': {'background': BLACK, 'grid': (30, 30, 30)},
+    'forest': {'background': (5, 25, 5), 'grid': (15, 60, 15)},
+    'ocean': {'background': (0, 15, 40), 'grid': (0, 40, 100)},
+    'neon': {'background': (5, 0, 20), 'grid': (50, 0, 80)},
+    'sunset': {'background': (40, 20, 0), 'grid': (100, 50, 0)}
 }
 
 # Настройки
@@ -213,7 +214,6 @@ def play_sound(sound_type):
         sound_params = {
             'eat': (440, 0.1),
             'golden': (880, 0.15),
-            'poison': (220, 0.2),
             'death': (110, 0.3)
         }
         freq, duration = sound_params.get(sound_type, (440, 0.1))
@@ -436,24 +436,26 @@ class Menu:
             self.screen.blit(exit_text, exit_text_rect)
             self.clickable_rects.append(('exit', exit_button))
             
-            # Кнопка Settings
-            settings_button = pygame.Rect(center_x - 230, center_y + 155, 100, 40)
-            pygame.draw.rect(self.screen, GRAY, settings_button)
-            settings_txt = self.small_font.render("⚙️", True, WHITE)
+            # Кнопка Settings - широкая кнопка слева
+            settings_button = pygame.Rect(center_x - 320, center_y + 165, 140, 45)
+            pygame.draw.rect(self.screen, (80, 80, 80), settings_button)
+            pygame.draw.rect(self.screen, GRAY, settings_button, 2)
+            settings_txt = self.small_font.render("⚙️ Settings", True, WHITE)
             self.screen.blit(settings_txt, settings_txt.get_rect(center=settings_button.center))
             self.clickable_rects.append(('settings', settings_button))
             
-            # Кнопка Leaderboard
-            leader_button = pygame.Rect(center_x + 130, center_y + 155, 100, 40)
-            pygame.draw.rect(self.screen, GOLD, leader_button)
-            leader_txt = self.small_font.render("🏆", True, BLACK)
+            # Кнопка Leaderboard - широкая кнопка справа
+            leader_button = pygame.Rect(center_x + 180, center_y + 165, 140, 45)
+            pygame.draw.rect(self.screen, (100, 80, 0), leader_button)
+            pygame.draw.rect(self.screen, GOLD, leader_button, 2)
+            leader_txt = self.small_font.render("🏆 Records", True, GOLD)
             self.screen.blit(leader_txt, leader_txt.get_rect(center=leader_button.center))
             self.clickable_rects.append(('leaderboard', leader_button))
             
             # Подзаголовок
             subtitle_font = pygame.font.SysFont(None, 28)
             subtitle = subtitle_font.render("Press ENTER to start", True, WHITE)
-            subtitle_rect = subtitle.get_rect(center=(center_x, center_y + 210))
+            subtitle_rect = subtitle.get_rect(center=(center_x, center_y + 225))
             self.screen.blit(subtitle, subtitle_rect)
             
             # Кнопка настроек
@@ -676,13 +678,13 @@ class Menu:
                             self.step = 'leaderboard'
                             return 'next'
                     elif item[0] == 'theme':
-                        if item[2].collidepoint(event.pos):
+                        if len(item) > 2 and item[2].collidepoint(event.pos):
                             self.current_theme = item[1]
                             self.settings['theme'] = item[1]
                             save_settings(self.settings)
                             return 'next'
                     elif item[0] == 'sound_toggle':
-                        if item[1].collidepoint(event.pos):
+                        if len(item) > 1 and item[1].collidepoint(event.pos):
                             self.settings['sound'] = not self.settings['sound']
                             save_settings(self.settings)
                             return 'next'
@@ -983,7 +985,12 @@ class SnakeGame:
         self.game_over = False
         self.game_started = True
         self.last_move_time = 0
+        self.last_bot_move_time = 0  # Отдельный таймер для бота
         self.walls_type = walls_type
+        self.countdown_start = None  # Время начала обратного отсчета
+        self.game_active = False  # Игра активна после обратного отсчета
+        self.countdown_start = None  # Время начала обратного отсчета
+        self.game_active = False  # Игра активна после обратного отсчета
 
     def random_food(self):
         while True:
@@ -1010,11 +1017,13 @@ class SnakeGame:
                     # Возврат в меню
                     self.game_started = False
                     return
-                for snake in self.snakes:
-                    if not snake.is_bot:
-                        snake.set_direction(event.key)
+                # Обрабатываем клавиши направления только когда игра активна (после обратного отсчета)
+                if self.game_active:
+                    for snake in self.snakes:
+                        if not snake.is_bot:
+                            snake.set_direction(event.key)
 
-    def move(self):
+    def move(self, current_time=0):
         # Определяем размеры поля по текущему окну
         # Размер поля всегда равен размеру окна
         field_width = self.screen.get_width()
@@ -1023,15 +1032,22 @@ class SnakeGame:
         walls_enabled = (self.walls_type == 'With walls')
         # wrap_around если "No walls" или "Teleport"
         wrap_around = (self.walls_type in ('No walls', 'Teleport'))
-        # Бот управляет собой
+        
+        # Бот управляет собой и двигается ТОЛЬКО по своему таймеру
         for snake in self.snakes:
             if snake.is_bot and snake.alive:
                 self.bot_move(snake)
-        # Двигаем всех живых змей
-        for snake in self.snakes:
-            if snake.alive:
-                # wrap_around если walls_type == 'No walls' или 'Teleport'
+                # Бот двигается с учетом своего bot_speedup независимо от игрока
+                bot_delay = self.move_delay // 2 if snake.bot_speedup else self.move_delay
+                if current_time - self.last_bot_move_time > bot_delay:
                     snake.move(wrap_around=wrap_around, field_width=field_width, field_height=field_height)
+                    self.last_bot_move_time = current_time
+        
+        # Двигаем только не-ботов (игроков) - они двигаются по отдельному таймеру в run()
+        for snake in self.snakes:
+            if not snake.is_bot and snake.alive:
+                # wrap_around если walls_type == 'No walls' или 'Teleport'
+                snake.move(wrap_around=wrap_around, field_width=field_width, field_height=field_height)
         # Проверяем коллизии только для живых змей
         for snake in self.snakes:
             if not snake.alive:
@@ -1059,11 +1075,6 @@ class SnakeGame:
                     growth = 3
                     if self.settings['sound']:
                         play_sound('golden')
-                elif food_type == 'poison':
-                    points = -10
-                    growth = -2  # Уменьшаем змею
-                    if self.settings['sound']:
-                        play_sound('poison')
                 else:  # normal
                     points = 10
                     growth = 1
@@ -1071,13 +1082,7 @@ class SnakeGame:
                         play_sound('eat')
                 
                 snake.score += points
-                if growth > 0:
-                    snake.grow(growth)
-                else:
-                    # Уменьшаем змею (убираем сегменты с конца)
-                    for _ in range(abs(growth)):
-                        if len(snake.body) > 1:
-                            snake.body.pop()
+                snake.grow(growth)
                 
                 self.food = self.random_food()
         if not any(s.alive for s in self.snakes):
@@ -1119,6 +1124,28 @@ class SnakeGame:
         high_score_text = font.render(f"High Score: {high_score}", True, GOLD)
         self.screen.blit(high_score_text, (10, 10))
         
+        # Отображение обратного отсчета
+        if not self.game_active and self.countdown_start is not None:
+            current_time = pygame.time.get_ticks()
+            elapsed = (current_time - self.countdown_start) / 1000.0
+            countdown = max(0, 3 - int(elapsed))
+            if countdown > 0:
+                # Полупрозрачный фон на весь экран
+                screen_width = self.screen.get_width()
+                screen_height = self.screen.get_height()
+                overlay = pygame.Surface((screen_width, screen_height))
+                overlay.set_alpha(128)
+                overlay.fill((0, 0, 0))
+                self.screen.blit(overlay, (0, 0))
+                
+                # Большие цифры обратного отсчета
+                countdown_font = pygame.font.Font(None, 200)
+                countdown_text = countdown_font.render(str(countdown), True, (255, 255, 0))
+                countdown_rect = countdown_text.get_rect(center=(screen_width // 2, screen_height // 2))
+                self.screen.blit(countdown_text, countdown_rect)
+            else:
+                self.game_active = True
+        
         # Score текущих игроков
         for i, snake in enumerate(self.snakes):
             if self.mode == "bot":
@@ -1158,10 +1185,6 @@ class SnakeGame:
             # Золотое яблоко
             food_color = GOLD
             darker_color = (200, 170, 0)
-        elif self.food['type'] == 'poison':
-            # Фиолетовое яблоко (яд)
-            food_color = PURPLE
-            darker_color = (100, 0, 150)
         else:
             # Красное яблоко
             food_color = RED
@@ -1210,6 +1233,11 @@ class SnakeGame:
             target = (px, py)
         else:
             target = (fx, fy)
+        
+        # Бот решает сам когда ускоряться
+        # Ускоряется если: далеко от цели (>200 пикселей) или близко к опасности
+        distance_to_target = abs(head[0] - target[0]) + abs(head[1] - target[1])
+        snake.bot_speedup = distance_to_target > 200
         
         # Нормализуем координаты стен к сетке
         walls_grid = set()
@@ -1365,23 +1393,32 @@ class SnakeGame:
             self.clock.tick(FPS)
 
     async def run(self):
+        # Запускаем обратный отсчет
+        self.countdown_start = pygame.time.get_ticks()
+        
         while not self.game_over:
             current_time = pygame.time.get_ticks()
             self.handle_events()
             # Проверка на возврат в меню по Escape
             if not self.game_started:
                 return 'menu'
-            # Ускорение змейки при удержании клавиш ускорения
-            speedup = False
-            keys = pygame.key.get_pressed()
-            for speedup_key in self.speedup_keys:
-                if keys[speedup_key]:
-                    speedup = True
-                    break
-            delay = self.move_delay // 2 if speedup else self.move_delay
-            if current_time - self.last_move_time > delay:
-                self.move()
-                self.last_move_time = current_time
+            
+            # Движение только после завершения обратного отсчета
+            if self.game_active:
+                # Ускорение змейки при удержании клавиш ускорения (только для игроков, НЕ для бота)
+                speedup = False
+                keys = pygame.key.get_pressed()
+                for speedup_key in self.speedup_keys:
+                    if keys[speedup_key]:
+                        speedup = True
+                        break
+                delay = self.move_delay // 2 if speedup else self.move_delay
+                
+                # Двигаем игроков по их таймеру
+                if current_time - self.last_move_time > delay:
+                    # Передаем current_time для обработки бота внутри move()
+                    self.move(current_time=current_time)
+                    self.last_move_time = current_time
             self.draw()
             await asyncio.sleep(0)
             self.clock.tick(FPS)
