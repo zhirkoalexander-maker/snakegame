@@ -545,35 +545,57 @@ class Menu:
             back_rect = back_text.get_rect(center=(center_x, center_y + 150))
             self.screen.blit(back_text, back_rect)
         elif self.step == 'settings':
-            title = self.font.render("Settings", True, WHITE)
-            title_rect = title.get_rect(center=(center_x, center_y - 200))
+            title = self.font.render("Game Settings", True, WHITE)
+            title_rect = title.get_rect(center=(center_x, center_y - 220))
             self.screen.blit(title, title_rect)
             
-            # Theme selection
-            theme_text = self.small_font.render("Theme:", True, WHITE)
-            self.screen.blit(theme_text, (center_x - 250, center_y - 140))
+            # Theme selection - левая колонка
+            theme_label = self.font.render("Visual Theme", True, GOLD)
+            self.screen.blit(theme_label, (center_x - 280, center_y - 160))
             
             for i, theme_name in enumerate(THEMES.keys()):
                 color = GREEN if self.current_theme == theme_name else WHITE
-                text = self.small_font.render(f"{i+1}. {theme_name.title()}", True, color)
-                button_rect = pygame.Rect(center_x - 250, center_y - 100 + i * 35, 200, 30)
+                # Переименовываем темы на русский
+                theme_names = {
+                    'classic': 'Classic Dark',
+                    'forest': 'Forest Green',
+                    'ocean': 'Ocean Blue',
+                    'neon': 'Neon Purple',
+                    'sunset': 'Sunset Orange'
+                }
+                display_name = theme_names.get(theme_name, theme_name.title())
+                text = self.small_font.render(display_name, True, color)
+                button_rect = pygame.Rect(center_x - 280, center_y - 110 + i * 45, 240, 38)
                 pygame.draw.rect(self.screen, GRAY, button_rect, 2)
-                self.screen.blit(text, (center_x - 240, center_y - 95 + i * 35))
+                if self.current_theme == theme_name:
+                    pygame.draw.rect(self.screen, GREEN, button_rect, 3)
+                self.screen.blit(text, (center_x - 270, center_y - 102 + i * 45))
                 self.clickable_rects.append(('theme', theme_name, button_rect))
             
-            # Sound toggle
-            sound_status = "ON" if self.settings['sound'] else "OFF"
+            # Sound toggle - правая колонка
+            sound_label = self.font.render("Audio", True, GOLD)
+            self.screen.blit(sound_label, (center_x + 40, center_y - 160))
+            
+            sound_status = "Enabled" if self.settings['sound'] else "Disabled"
             sound_color = GREEN if self.settings['sound'] else RED
-            sound_text = self.small_font.render(f"Sound: {sound_status}", True, sound_color)
-            sound_button = pygame.Rect(center_x + 50, center_y - 100, 200, 40)
+            sound_text = self.small_font.render(f"Sound Effects: {sound_status}", True, sound_color)
+            sound_button = pygame.Rect(center_x + 40, center_y - 110, 240, 50)
             pygame.draw.rect(self.screen, GRAY, sound_button, 2)
-            self.screen.blit(sound_text, (center_x + 60, center_y - 90))
+            if self.settings['sound']:
+                pygame.draw.rect(self.screen, GREEN, sound_button, 3)
+            self.screen.blit(sound_text, (center_x + 55, center_y - 95))
             self.clickable_rects.append(('sound_toggle', sound_button))
+            
+            # Подсказка
+            hint_font = pygame.font.SysFont(None, 24)
+            hint = hint_font.render("Click on any option to change", True, GRAY)
+            hint_rect = hint.get_rect(center=(center_x, center_y + 100))
+            self.screen.blit(hint, hint_rect)
             
             # Back button
             back_button = pygame.Rect(center_x - 100, center_y + 150, 200, 50)
-            pygame.draw.rect(self.screen, GRAY, back_button)
-            back_text = self.small_font.render("Back", True, WHITE)
+            pygame.draw.rect(self.screen, (100, 100, 100), back_button)
+            back_text = self.small_font.render("Back to Menu", True, WHITE)
             self.screen.blit(back_text, back_text.get_rect(center=back_button.center))
             self.clickable_rects.append(('back_to_menu', back_button))
             
