@@ -44,27 +44,15 @@
             display: block;
             background: #000;
         }
-        .controls {
-            margin-top: 20px;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            max-width: 600px;
-            margin: 20px auto;
-        }
-        .control-box {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #00ff00;
-        }
-        .control-box h3 {
-            color: #00ff00;
-            margin-bottom: 10px;
-        }
         .score {
             font-size: 1.5em;
             color: #00ff00;
+            margin: 15px 0;
+        }
+        .score-display {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
             margin: 15px 0;
         }
         .buttons {
@@ -102,25 +90,63 @@
             background: #444;
             transform: scale(1.05);
         }
-        #gameOver {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        #menu, #gameOver {
             background: rgba(0, 0, 0, 0.95);
             padding: 40px;
             border-radius: 15px;
-            border: 3px solid #ff0000;
-            text-align: center;
+            border: 3px solid #00ff00;
+            max-width: 600px;
+            margin: 20px auto;
         }
-        #gameOver.show {
-            display: block;
+        #menu h2, #gameOver h2 {
+            color: #00ff00;
+            font-size: 2em;
+            margin-bottom: 30px;
         }
         #gameOver h2 {
             color: #ff0000;
-            font-size: 2.5em;
-            margin-bottom: 20px;
+        }
+        .menu-option {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .menu-option:hover {
+            background: rgba(0, 255, 0, 0.2);
+            transform: scale(1.02);
+        }
+        .menu-option.selected {
+            background: rgba(0, 255, 0, 0.3);
+            border-color: #00ff00;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .color-picker {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .color-option:hover {
+            transform: scale(1.2);
+        }
+        .color-option.selected {
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
         }
     </style>
 </head>
@@ -128,43 +154,43 @@
     <div class="container">
         <h1>🐍 Snake Game 🐍</h1>
         
-        <div class="score">
-            Score: <span id="score">0</span>
+        <!-- Menu -->
+        <div id="menu">
+            <h2>Main Menu</h2>
+            <div id="menuContent"></div>
         </div>
         
-        <div class="game-wrapper">
-            <canvas id="gameCanvas" width="600" height="600"></canvas>
-            
-            <div id="gameOver">
-                <h2>Game Over!</h2>
-                <p class="score">Final Score: <span id="finalScore">0</span></p>
-                <div class="buttons">
-                    <button class="btn-primary" onclick="restartGame()">🔄 Restart</button>
-                    <a href="index.html" class="btn-secondary">← Back to Menu</a>
+        <!-- Game -->
+        <div id="gameScreen" class="hidden">
+            <div class="score-display">
+                <div class="score">
+                    P1 Score: <span id="score1">0</span>
+                </div>
+                <div class="score" id="score2Display" class="hidden">
+                    P2 Score: <span id="score2">0</span>
                 </div>
             </div>
-        </div>
-        
-        <div class="buttons">
-            <button class="btn-primary" onclick="restartGame()">🔄 Restart Game</button>
-            <a href="index.html" class="btn-secondary">← Back to Menu</a>
-        </div>
-        
-        <div class="controls">
-            <div class="control-box">
-                <h3>🎮 Controls</h3>
-                <p>⬆️ Arrow Up</p>
-                <p>⬇️ Arrow Down</p>
-                <p>⬅️ Arrow Left</p>
-                <p>➡️ Arrow Right</p>
-                <p>⚡ Space (Speed)</p>
+            
+            <div class="game-wrapper">
+                <canvas id="gameCanvas" width="600" height="600"></canvas>
             </div>
-            <div class="control-box">
-                <h3>ℹ️ How to Play</h3>
-                <p>• Eat red food to grow</p>
-                <p>• Avoid hitting walls</p>
-                <p>• Don't hit yourself</p>
-                <p>• Use space to speed up</p>
+            
+            <div class="buttons">
+                <button class="btn-primary" onclick="restartGame()">🔄 Restart</button>
+                <button class="btn-secondary" onclick="backToMenu()">← Menu</button>
+                <a href="index.html" class="btn-secondary">🏠 Home</a>
+            </div>
+        </div>
+        
+        <!-- Game Over -->
+        <div id="gameOver" class="hidden">
+            <h2>Game Over!</h2>
+            <p class="score">Winner: <span id="winner">-</span></p>
+            <p class="score">P1 Score: <span id="finalScore1">0</span></p>
+            <p class="score" id="finalScore2Display" class="hidden">P2 Score: <span id="finalScore2">0</span></p>
+            <div class="buttons">
+                <button class="btn-primary" onclick="restartGame()">🔄 Restart</button>
+                <button class="btn-secondary" onclick="backToMenu()">← Menu</button>
             </div>
         </div>
     </div>
