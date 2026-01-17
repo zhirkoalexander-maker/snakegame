@@ -3,76 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Game 🐍</title>
+    <title>Super Snake Game</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
-            color: white;
-        }
-        .container {
-            max-width: 900px;
-            width: 100%;
+            align-items: center;
             padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
             text-align: center;
         }
+
         h1 {
-            font-size: 3em;
+            font-size: 4em;
             margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            text-shadow: 0 0 30px rgba(0, 255, 0, 0.7);
+            color: #00ff00;
+            animation: glow 2s ease-in-out infinite;
         }
-        .game-container {
-            background: rgba(0, 0, 0, 0.3);
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 30px rgba(0, 255, 0, 0.7); }
+            50% { text-shadow: 0 0 50px rgba(0, 255, 0, 1); }
+        }
+
+        .subtitle {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+            color: #aaa;
+        }
+
+        .features {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 30px;
             border-radius: 15px;
-            padding: 20px;
-            margin: 20px auto;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
+            margin: 30px 0;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
-        canvas {
+
+        .features h2 {
+            color: #00ff00;
+            margin-bottom: 20px;
+        }
+
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .features li {
+            padding: 10px 0;
+            font-size: 1.1em;
+        }
+
+        .features li::before {
+            content: "🎮 ";
+            margin-right: 10px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .btn-primary:hover {
+            background: #00cc00;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #fff;
+            border: 2px solid #00ff00;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+            transform: scale(1.05);
+        }
+
+        .btn-play {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: 2px solid #00ff00;
+        }
+
+        .btn-play:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.8);
+        }
+
+        .instructions {
+            margin-top: 40px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-            display: block;
+        }
+
+        .instructions h3 {
+            color: #00ff00;
+            margin-bottom: 15px;
+        }
+
+        .instructions ol {
+            text-align: left;
+            max-width: 500px;
             margin: 0 auto;
         }
-        .info {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+
+        .instructions li {
+            padding: 8px 0;
+        }
+
+        .snake-icon {
+            font-size: 5em;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .controls-info {
+            margin-top: 30px;
             padding: 20px;
-            margin-top: 20px;
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border-left: 4px solid #00ff00;
         }
-        .info h2 {
-            margin-bottom: 15px;
-            font-size: 1.5em;
+
+        .controls-info h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
         }
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            text-align: left;
-            margin-top: 15px;
+
+        #game-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
         }
-        .control-item {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            border-radius: 8px;
+
+        #game-container.active {
+            display: flex;
         }
+
+        #close-game {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        #close-game:hover {
+            background: #cc0000;
+        }
+
         .loading {
-            font-size: 1.2em;
-            margin: 20px 0;
+            font-size: 1.5em;
+            color: #00ff00;
             animation: pulse 2s infinite;
         }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -102,64 +247,93 @@
 </head>
 <body>
     <div class="container">
-        <h1>🐍 Snake Game 🐍</h1>
-        
-        <div class="game-container">
-            <div id="pygame_canvas" style="margin: 0 auto;">
-                <div class="loading">Loading game... Please wait ⏳</div>
-            </div>
-        </div>
+        <div class="snake-icon">🐍</div>
+        <h1>SUPER SNAKE GAME</h1>
+        <p class="subtitle">Classic Snake with modern features!</p>
 
-        <div class="info">
-            <h2>🎮 Game Features</h2>
-            <ul style="text-align: left; line-height: 2;">
-                <li>🎯 Single Player vs Bot</li>
-                <li>👥 Two Player Mode (PvP)</li>
-                <li>⚙️ Customizable Controls</li>
-                <li>🎨 Color Themes</li>
-                <li>🏆 Multiple Difficulty Levels</li>
-                <li>🧱 Wall Options (On/Off/Warp)</li>
+        <div class="features">
+            <h2>✨ Features</h2>
+            <ul>
+                <li>Multiple game modes: Single Player, PvP, Bot</li>
+                <li>Customizable controls for both players</li>
+                <li>Three difficulty levels</li>
+                <li>Configurable speed boost</li>
+                <li>Beautiful graphics and smooth gameplay</li>
             </ul>
         </div>
 
-        <div class="info">
-            <h2>🕹️ Default Controls</h2>
-            <div class="controls">
-                <div class="control-item">
-                    <strong>Player 1:</strong><br>
-                    ⬆️ Up Arrow<br>
-                    ⬇️ Down Arrow<br>
-                    ⬅️ Left Arrow<br>
-                    ➡️ Right Arrow<br>
-                    ⚡ Right Shift (Speed)
-                </div>
-                <div class="control-item">
-                    <strong>Player 2:</strong><br>
-                    W - Up<br>
-                    S - Down<br>
-                    A - Left<br>
-                    D - Right<br>
-                    ⚡ Left Shift (Speed)
-                </div>
-            </div>
+        <div class="buttons">
+            <button onclick="startGame()" class="btn btn-play">
+                🎮 Play Online
+            </button>
+            <a href="https://github.com/zhirkoalexander-maker/snakegame/archive/refs/heads/main.zip" class="btn btn-primary">
+                📥 Download Game
+            </a>
+            <a href="https://github.com/zhirkoalexander-maker/snakegame" class="btn btn-secondary" target="_blank">
+                📂 View on GitHub
+            </a>
+        </div>
+
+        <div class="instructions">
+            <h3>🚀 How to Play</h3>
+            <ol>
+                <li>Click "Play Online" to play in browser (experimental)</li>
+                <li>Or download the game for better performance</li>
+                <li>Install Python 3.8+ if not installed</li>
+                <li>Run: <code style="background: #000; padding: 3px 8px; border-radius: 4px;">pip install pygame</code></li>
+                <li>Run: <code style="background: #000; padding: 3px 8px; border-radius: 4px;">python main.py</code></li>
+                <li>Enjoy! 🎮</li>
+            </ol>
+        </div>
+
+        <div class="controls-info">
+            <h3>🎮 Default Controls</h3>
+            <p><strong>Player 1:</strong> Arrow Keys + Right Shift (speedup)</p>
+            <p><strong>Player 2:</strong> WASD + Left Shift (speedup)</p>
+            <p style="margin-top: 10px; color: #aaa;">All controls are customizable in-game!</p>
+        </div>
+
+        <div style="margin-top: 40px; color: #666;">
+            <p>Made with ❤️ using Pygame</p>
+            <p style="margin-top: 10px;">© 2026 - Free to use and modify</p>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <button id="close-game" onclick="closeGame()">✖ Close Game</button>
+        <div id="pygame_canvas">
+            <div class="loading">Loading game... Please wait ⏳</div>
         </div>
     </div>
 
     <script src="https://pygame-web.github.io/archives/0.9/pythons.js" type="module"></script>
     <script type="application/javascript">
-        window.addEventListener('load', async () => {
-            const pyodideWorker = new Worker('./pyodide-worker.js');
-            
-            pyodideWorker.onmessage = (event) => {
-                if (event.data.type === 'ready') {
-                    document.querySelector('.loading').textContent = 'Game loaded! Starting...';
-                } else if (event.data.type === 'error') {
-                    document.querySelector('.loading').textContent = 'Error loading game: ' + event.data.message;
-                }
-            };
-            
-            pyodideWorker.postMessage({ type: 'loadPygame' });
-        });
+        function startGame() {
+            document.getElementById('game-container').classList.add('active');
+            loadGame();
+        }
+
+        function closeGame() {
+            document.getElementById('game-container').classList.remove('active');
+        }
+
+        async function loadGame() {
+            try {
+                const pyodideWorker = new Worker('./pyodide-worker.js');
+                
+                pyodideWorker.onmessage = (event) => {
+                    if (event.data.type === 'ready') {
+                        document.querySelector('.loading').textContent = 'Game loaded! Starting...';
+                    } else if (event.data.type === 'error') {
+                        document.querySelector('.loading').textContent = 'Error: ' + event.data.message;
+                    }
+                };
+                
+                pyodideWorker.postMessage({ type: 'loadPygame' });
+            } catch (error) {
+                document.querySelector('.loading').textContent = 'Error loading game. Try downloading instead.';
+            }
+        }
     </script>
 </body>
 </html>
