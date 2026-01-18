@@ -14,23 +14,28 @@ let speed = 150;
 let normalSpeed = 150;
 let fastSpeed = 75;
 let gameLoop;
-let wallsEnabled = true;
+let wallsMode = 'no_walls'; // 'with_walls' or 'no_walls'
 let soundEnabled = true;
 let currentTheme = 'dark';
+let countdown = 0;
+let countdownInterval = null;
+let highScore = 0;
 
 // Menu
 let menuStep = 'mode';
-const menuSteps = ['mode', 'settings', 'color', 'start'];
+const menuSteps = ['mode', 'settings', 'rules', 'color', 'start'];
 
 // Players
 let players = [];
 let food = {};
-let foodType = 'normal'; // normal, golden, poison
+let foodType = 'normal'; // normal, golden (removed poison)
 
 // Bot AI
 let botDifficulty = 'medium';
+let botSpeedupActive = false;
+let botLastSpeedup = 0;
 
-// Colors and Themes
+// Colors and Themes (enhanced contrast)
 const COLOR_OPTIONS = [
     { name: 'Green', value: '#00ff00' },
     { name: 'Blue', value: '#0099ff' },
@@ -41,18 +46,17 @@ const COLOR_OPTIONS = [
 ];
 
 const THEMES = {
-    dark: { bg: '#000000', grid: '#1a1a1a', text: '#00ff00' },
-    light: { bg: '#ffffff', grid: '#e0e0e0', text: '#00aa00' },
-    neon: { bg: '#0a0a1a', grid: '#1a0033', text: '#ff00ff' },
-    forest: { bg: '#0d1f0d', grid: '#1a3a1a', text: '#00ff00' },
-    ocean: { bg: '#001a33', grid: '#003366', text: '#00aaff' }
+    dark: { bg: '#000000', grid: '#0d0d0d', text: '#00ff00', name: 'Dark' },
+    light: { bg: '#d0d0d0', grid: '#e8e8e8', text: '#006400', name: 'Light' },
+    neon: { bg: '#050510', grid: '#150520', text: '#ff00ff', name: 'Neon' },
+    forest: { bg: '#051005', grid: '#0a2010', text: '#00ff00', name: 'Forest' },
+    ocean: { bg: '#001020', grid: '#002040', text: '#00aaff', name: 'Ocean' }
 };
 
 const COLORS = {
     background: '#000000',
     food: '#ff0000',
     foodGolden: '#ffd700',
-    foodPoison: '#9900ff',
     grid: '#1a1a1a',
     player2: '#0099ff',
     bot: '#ff9900'
@@ -60,10 +64,9 @@ const COLORS = {
 
 // Sound effects
 const sounds = {
-    eat: () => playSound(400, 0.1),
-    death: () => playSound(200, 0.3),
-    golden: () => playSound(600, 0.15),
-    poison: () => playSound(150, 0.2)
+    eat: () => playSound(440, 0.1),
+    death: () => playSound(110, 0.3),
+    golden: () => playSound(880, 0.15)
 };
 
 function playSound(freq, duration) {
@@ -174,29 +177,68 @@ function renderMenu() {
             <div class="buttons" style="margin-top: 20px;">
                 <button class="btn-secondary" onclick="showLeaderboard()">🏆 Leaderboard</button>
                 <button class="btn-secondary" onclick="menuStep='settings'; renderMenu()">⚙️ Settings</button>
+                <button class="btn-secondary" onclick="menuStep='rules'; renderMenu()">📖 Rules</button>
             </div>
         `;
     } else if (menuStep === 'settings') {
         menuContent.innerHTML = `
-            <h3 style="color: #00ff00; margin-bottom: 20px;">Settings</h3>
-            <div class="menu-option" onclick="toggleWalls()">
-                <h4>🧱 Walls: ${wallsEnabled ? 'ON' : 'OFF'}</h4>
-                <p>${wallsEnabled ? 'Hit walls = death' : 'Teleport through walls'}</p>
+            <h3 style="color: #00ff00; margin-bottom: 20px;">⚙️ SETTINGS</h3>
+            
+            <div style="text-align: left; max-width: 500px; margin: 0 auto;">
+                <h4 style="color: #00ff00; margin: 15px 0 10px; text-align: center;">🎨 VISUAL</h4>
+                <div class="menu-option" onclick="nextTheme()">
+                    <h4>Theme: ${THEMES[currentTheme].name}</h4>
+                    <p>Click to change</p>
+                </div>
+                
+                <h4 style="color: #00ff00; margin: 25px 0 10px; text-align: center;">🔊 AUDIO</h4>
+                <div class="menu-option" onclick="toggleSound()">
+                    <h4>Sound: ${soundEnabled ? 'ON' : 'OFF'}</h4>
+                    <p>Toggle sound effects</p>
+                </div>
+                
+                <h4 style="color: #00ff00; margin: 25px 0 10px; text-align: center;">🎮 GAMEPLAY</h4>
+                <div class="menu-option" onclick="toggleWalls()">
+                    <h4>Walls: ${wallsMode === 'with_walls' ? 'Enabled' : 'Disabled'}</h4>
+                    <p>${wallsMode === 'with_walls' ? 'Hit walls = death' : 'Teleport through edges'}</p>
+                </div>
             </div>
-            <div class="menu-option" onclick="toggleSound()">
-                <h4>🔊 Sound: ${soundEnabled ? 'ON' : 'OFF'}</h4>
-                <p>Toggle sound effects</p>
+            
+            <div class="buttons" style="margin-top: 30px;">
+                <button class="btn-secondary" onclick="menuStep='mode'; renderMenu()">← Back</button>
             </div>
-            <h4 style="color: #00ff00; margin: 20px 0;">Select Theme</h4>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
-                ${Object.keys(THEMES).map(theme => `
-                    <div class="theme-option ${currentTheme === theme ? 'selected' : ''}" 
-                         style="background: ${THEMES[theme].bg}; border: 2px solid ${THEMES[theme].text};"
-                         onclick="selectTheme('${theme}')">
-                        <div style="color: ${THEMES[theme].text}; text-transform: capitalize;">${theme}</div>
-                    </div>
-                `).join('')}
+        `;
+    } else if (menuStep === 'rules') {
+        menuContent.innerHTML = `
+            <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <h3 style="color: #00ff00; margin-bottom: 20px; text-align: center;">📖 GAME RULES</h3>
+                
+                <h4 style="color: #00ff00; margin-top: 20px;">🎯 OBJECTIVE</h4>
+                <p style="color: #aaa; line-height: 1.6;">
+                    Eat food to grow your snake and earn points. Avoid hitting walls, 
+                    yourself, or your opponent. The longer you survive, the higher your score!
+                </p>
+                
+                <h4 style="color: #00ff00; margin-top: 20px;">🎮 CONTROLS</h4>
+                <p style="color: #aaa; line-height: 1.6;">
+                    <strong>Player 1:</strong> Arrow Keys to move, Space to speed up<br>
+                    <strong>Player 2:</strong> WASD to move, Ctrl to speed up
+                </p>
+                
+                <h4 style="color: #00ff00; margin-top: 20px;">🍎 FOOD TYPES</h4>
+                <p style="color: #aaa; line-height: 1.6;">
+                    <span style="color: #ff0000;">● Red Apple:</span> +10 points<br>
+                    <span style="color: #ffd700;">● Golden Apple:</span> +30 points, grow by 3 segments
+                </p>
+                
+                <h4 style="color: #00ff00; margin-top: 20px;">🕹️ GAME MODES</h4>
+                <p style="color: #aaa; line-height: 1.6;">
+                    <strong>Single Player:</strong> Classic snake game<br>
+                    <strong>Player vs Bot:</strong> Compete against AI<br>
+                    <strong>Player vs Player:</strong> Local multiplayer
+                </p>
             </div>
+            
             <div class="buttons" style="margin-top: 30px;">
                 <button class="btn-secondary" onclick="menuStep='mode'; renderMenu()">← Back</button>
             </div>
@@ -222,7 +264,19 @@ function renderMenu() {
 }
 
 function toggleWalls() {
-    wallsEnabled = !wallsEnabled;
+    wallsMode = wallsMode === 'with_walls' ? 'no_walls' : 'with_walls';
+    renderMenu();
+}
+
+function nextTheme() {
+    const themes = Object.keys(THEMES);
+    const currentIndex = themes.indexOf(currentTheme);
+    const nextIndex = (currentIndex + 1) % themes.length;
+    currentTheme = themes[nextIndex];
+    
+    const themeColors = THEMES[currentTheme];
+    COLORS.background = themeColors.bg;
+    COLORS.grid = themeColors.grid;
     renderMenu();
 }
 
@@ -301,11 +355,25 @@ function startGame() {
     }
     
     spawnFood();
-    gameRunning = true;
     speed = normalSpeed;
     
-    if (gameLoop) clearInterval(gameLoop);
-    gameLoop = setInterval(update, speed);
+    // 3-second countdown
+    countdown = 3;
+    gameRunning = false;
+    draw();
+    drawCountdown();
+    
+    countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+            drawCountdown();
+        } else {
+            clearInterval(countdownInterval);
+            gameRunning = true;
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, speed);
+        }
+    }, 1000);
     
     updateScores();
 }
@@ -334,14 +402,12 @@ function spawnFood() {
         allSnakeCells = allSnakeCells.concat(player.body);
     });
     
-    // Random food type
+    // Random food type (only normal and golden, no poison)
     const rand = Math.random();
-    if (rand < 0.7) {
+    if (rand < 0.8) {
         foodType = 'normal';
-    } else if (rand < 0.85) {
-        foodType = 'golden';
     } else {
-        foodType = 'poison';
+        foodType = 'golden';
     }
     
     do {
@@ -352,12 +418,24 @@ function spawnFood() {
     } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y));
 }
 
-// Bot AI
+// Bot AI with autonomous speedup
 function botMove(bot) {
     if (!bot.alive) return;
     
     const head = bot.body[0];
-    const foodDist = { x: food.x - head.x, y: food.y - head.y };
+    const foodDist = { 
+        x: food.x - head.x, 
+        y: food.y - head.y 
+    };
+    const distance = Math.sqrt(foodDist.x * foodDist.x + foodDist.y * foodDist.y) * CELL_SIZE;
+    
+    // Autonomous speedup when far from food
+    const now = Date.now();
+    if (distance > 200 && now - botLastSpeedup > 2000) {
+        botSpeedupActive = true;
+        botLastSpeedup = now;
+        setTimeout(() => { botSpeedupActive = false; }, 1000);
+    }
     
     // Simple pathfinding
     let possibleDirs = [];
@@ -380,7 +458,7 @@ function botMove(bot) {
         
         // Check if safe
         let safe = true;
-        if (wallsEnabled) {
+        if (wallsMode === 'with_walls') {
             if (newHead.x < 0 || newHead.x >= GRID_WIDTH || newHead.y < 0 || newHead.y >= GRID_HEIGHT) {
                 safe = false;
             }
@@ -422,16 +500,20 @@ function update() {
             y: player.body[0].y + player.direction.y
         };
         
-        // Wall handling
-        if (!wallsEnabled) {
-            // Teleport
-            if (head.x < 0) head.x = GRID_WIDTH - 1;
-            if (head.x >= GRID_WIDTH) head.x = 0;
-            if (head.y < 0) head.y = GRID_HEIGHT - 1;
-            if (head.y >= GRID_HEIGHT) head.y = 0;
-        } else {
-            // Check wall collision
-            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
+        // Wall handling - always teleport through edges
+        if (head.x < 0) head.x = GRID_WIDTH - 1;
+        if (head.x >= GRID_WIDTH) head.x = 0;
+        if (head.y < 0) head.y = GRID_HEIGHT - 1;
+        if (head.y >= GRID_HEIGHT) head.y = 0;
+        
+        // Check wall collision only if walls are enabled
+        if (wallsMode === 'with_walls') {
+            const originalHead = {
+                x: player.body[0].x + player.direction.x,
+                y: player.body[0].y + player.direction.y
+            };
+            if (originalHead.x < 0 || originalHead.x >= GRID_WIDTH || 
+                originalHead.y < 0 || originalHead.y >= GRID_HEIGHT) {
                 player.alive = false;
                 sounds.death();
                 return;
@@ -467,15 +549,16 @@ function update() {
             } else if (foodType === 'golden') {
                 player.score += 30;
                 sounds.golden();
-            } else if (foodType === 'poison') {
-                player.score = Math.max(0, player.score - 10);
-                sounds.poison();
-                // Shrink snake
-                if (player.body.length > 3) {
-                    player.body.pop();
-                    player.body.pop();
-                }
+                // Grow by 3 segments
+                player.body.push(player.body[player.body.length - 1]);
+                player.body.push(player.body[player.body.length - 1]);
             }
+            
+            // Update high score
+            if (player.score > highScore) {
+                highScore = player.score;
+            }
+            
             updateScores();
             spawnFood();
         } else {
@@ -499,6 +582,12 @@ function draw() {
             ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         }
     }
+    
+    // Draw High Score
+    ctx.fillStyle = '#00ff00';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('High Score: ' + highScore, 10, 20);
     
     // Draw players
     players.forEach(player => {
@@ -527,9 +616,7 @@ function draw() {
     });
     
     // Draw food
-    let foodColor = COLORS.food;
-    if (foodType === 'golden') foodColor = COLORS.foodGolden;
-    if (foodType === 'poison') foodColor = COLORS.foodPoison;
+    let foodColor = foodType === 'golden' ? COLORS.foodGolden : COLORS.food;
     
     ctx.fillStyle = foodColor;
     ctx.beginPath();
@@ -559,11 +646,24 @@ function draw() {
         ctx.fillStyle = '#fff';
         ctx.font = '12px Arial';
         ctx.fillText('★', food.x * CELL_SIZE + 5, food.y * CELL_SIZE + 15);
-    } else if (foodType === 'poison') {
-        ctx.fillStyle = '#fff';
-        ctx.font = '12px Arial';
-        ctx.fillText('☠', food.x * CELL_SIZE + 5, food.y * CELL_SIZE + 15);
     }
+}
+
+function drawCountdown() {
+    draw();
+    
+    // Full screen overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Countdown number
+    ctx.fillStyle = '#00ff00';
+    ctx.font = 'bold 120px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(countdown.toString(), canvas.width / 2, canvas.height / 2);
+    
+    ctx.textBaseline = 'alphabetic';
 }
 
 function gameOver() {
@@ -612,10 +712,10 @@ const pressedKeys = {};
 document.addEventListener('keydown', (e) => {
     pressedKeys[e.key] = true;
     
-    if (!gameRunning) return;
+    if (!gameRunning || countdown > 0) return;
     
     players.forEach(player => {
-        if (!player.alive) return;
+        if (!player.alive || player.isBot) return;
         
         const controls = player.controls;
         
@@ -641,9 +741,10 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
     pressedKeys[e.key] = false;
     
-    if (!gameRunning) return;
+    if (!gameRunning || countdown > 0) return;
     
     players.forEach(player => {
+        if (player.isBot) return;
         if (e.key === player.controls.speed && player.speedUp) {
             player.speedUp = false;
             clearInterval(gameLoop);
