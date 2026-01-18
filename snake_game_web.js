@@ -500,24 +500,20 @@ function update() {
             y: player.body[0].y + player.direction.y
         };
         
-        // Wall handling - always teleport through edges
-        if (head.x < 0) head.x = GRID_WIDTH - 1;
-        if (head.x >= GRID_WIDTH) head.x = 0;
-        if (head.y < 0) head.y = GRID_HEIGHT - 1;
-        if (head.y >= GRID_HEIGHT) head.y = 0;
-        
-        // Check wall collision only if walls are enabled
+        // Wall handling
         if (wallsMode === 'with_walls') {
-            const originalHead = {
-                x: player.body[0].x + player.direction.x,
-                y: player.body[0].y + player.direction.y
-            };
-            if (originalHead.x < 0 || originalHead.x >= GRID_WIDTH || 
-                originalHead.y < 0 || originalHead.y >= GRID_HEIGHT) {
+            // Check wall collision - death if hit wall
+            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
                 player.alive = false;
                 sounds.death();
                 return;
             }
+        } else {
+            // Teleport through edges
+            if (head.x < 0) head.x = GRID_WIDTH - 1;
+            if (head.x >= GRID_WIDTH) head.x = 0;
+            if (head.y < 0) head.y = GRID_HEIGHT - 1;
+            if (head.y >= GRID_HEIGHT) head.y = 0;
         }
         
         // Check self collision
@@ -588,6 +584,13 @@ function draw() {
     ctx.font = 'bold 16px Arial';
     ctx.textAlign = 'left';
     ctx.fillText('High Score: ' + highScore, 10, 20);
+    
+    // Draw walls if enabled
+    if (wallsMode === 'with_walls') {
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    }
     
     // Draw players
     players.forEach(player => {
