@@ -1,0 +1,8 @@
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/"
+  to = "/snake_game_web.html"
+  status = 200
+  force = true
