@@ -2,7 +2,6 @@
   publish = "."
 
 [[redirects]]
-  from = "/"
-  to = "/snake_game_web.html"
+  from = "/*"
+  to = "/index.html"
   status = 200
-  force = true
