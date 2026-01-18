@@ -194,6 +194,31 @@
         body.ocean {
             background: linear-gradient(135deg, #0a2540 0%, #051829 100%);
         }
+        .footer {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .footer p {
+            color: #aaa;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .footer a {
+            color: #00ff00;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .footer a:hover {
+            color: #00cc00;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -251,6 +276,18 @@
                 <button class="btn-secondary" onclick="backToMenu()">← Menu</button>
             </div>
         </div>
+    </div>
+    
+    <div class="footer">
+        <p>🐍 <strong>Snake Game</strong> - Classic arcade game reimagined</p>
+        <p>🎮 Also available as <strong>Python Desktop Version</strong> with enhanced features!</p>
+        <p>
+            📦 <a href="https://github.com/zhirkoalexander-maker/snakegame" target="_blank">View on GitHub</a> | 
+            Download Python version for offline play
+        </p>
+        <p style="font-size: 0.9em; color: #666;">
+            Made with ❤️ using Pygame (Desktop) and HTML5 Canvas (Web)
+        </p>
     </div>
     
     <script src="snake_game_web.js"></script>
