@@ -22,7 +22,9 @@ let countdownInterval = null;
 let highScore = 0;
 
 // Multiplayer
-const SERVER_URL = 'wss://snake-multiplayer-server.glitch.me'; // Change to your Glitch URL
+// ВАЖНО: Замените на ваш URL после деплоя сервера на Glitch!
+// Инструкция: https://github.com/zhirkoalexander-maker/snakegame/blob/main/QUICKSTART_MULTIPLAYER.md
+const SERVER_URL = ''; // Например: 'wss://your-project-name.glitch.me'
 let ws = null;
 let multiplayerRoomId = null;
 let multiplayerPlayerId = null;
@@ -985,7 +987,32 @@ function showMultiplayerMenu() {
 function connectWebSocket() {
     if (ws && ws.readyState === WebSocket.OPEN) return Promise.resolve();
     
+    // Проверка, что URL сервера установлен
+    if (!SERVER_URL || SERVER_URL === '') {
+        document.getElementById('multiplayerStatus').innerHTML = `
+            <div style="color: #ff9900; text-align: left; max-width: 500px; margin: 20px auto; padding: 15px; background: #221100; border: 2px solid #ff9900; border-radius: 5px;">
+                <h4 style="color: #ff9900; margin: 0 0 10px 0;">⚠️ Сервер не настроен</h4>
+                <p style="margin: 5px 0; font-size: 14px;">Для игры в онлайн мультиплеер нужно:</p>
+                <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                    <li>Задеплоить сервер на Glitch (5 минут)</li>
+                    <li>Обновить SERVER_URL в коде</li>
+                    <li>Запушить изменения</li>
+                </ol>
+                <p style="margin: 10px 0 0 0; font-size: 14px;">
+                    📖 <a href="https://github.com/zhirkoalexander-maker/snakegame/blob/main/QUICKSTART_MULTIPLAYER.md" 
+                         target="_blank" style="color: #00ff00; text-decoration: underline;">
+                         Инструкция по настройке
+                    </a>
+                </p>
+            </div>
+        `;
+        return Promise.reject(new Error('Server URL not configured'));
+    }
+    
     return new Promise((resolve, reject) => {
+        document.getElementById('multiplayerStatus').textContent = '🔄 Connecting to server...';
+        document.getElementById('multiplayerStatus').style.color = '#ffff00';
+        
         ws = new WebSocket(SERVER_URL);
         
         ws.onopen = () => {
@@ -995,8 +1022,12 @@ function connectWebSocket() {
         };
         
         ws.onerror = () => {
-            document.getElementById('multiplayerStatus').textContent = '❌ Connection error';
-            document.getElementById('multiplayerStatus').style.color = '#ff0000';
+            document.getElementById('multiplayerStatus').innerHTML = `
+                <div style="color: #ff0000;">
+                    ❌ Не удалось подключиться к серверу
+                    <br><small>Проверьте, что сервер запущен на Glitch</small>
+                </div>
+            `;
             reject(new Error('WebSocket connection failed'));
         };
         
@@ -1022,7 +1053,7 @@ function createRoom() {
             playerName: playerName
         }));
     }).catch(err => {
-        alert('Cannot connect to server. Please try again later.');
+        // Ошибка уже отображена в connectWebSocket
     });
 }
 
@@ -1034,7 +1065,7 @@ function showRoomList() {
             type: 'list_rooms'
         }));
     }).catch(err => {
-        alert('Cannot connect to server. Please try again later.');
+        // Ошибка уже отображена в connectWebSocket
     });
 }
 
