@@ -371,7 +371,7 @@ function startGame() {
             clearInterval(countdownInterval);
             gameRunning = true;
             if (gameLoop) clearInterval(gameLoop);
-            gameLoop = setInterval(update, speed);
+            gameLoop = setInterval(update, 50); // Fast update loop, individual player speeds handled in update()
         }
     }, 1000);
     
@@ -392,7 +392,9 @@ function createSnake(x, y, dx, dy, color, controls, isBot = false) {
         score: 0,
         alive: true,
         speedUp: false,
-        isBot: isBot
+        isBot: isBot,
+        moveCounter: 0,
+        moveInterval: normalSpeed
     };
 }
 
@@ -418,7 +420,7 @@ function spawnFood() {
     } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y));
 }
 
-// Bot AI with autonomous speedup
+// Bot AI with autonomous speedup and attack strategies
 function botMove(bot) {
     if (!bot.alive) return;
     
@@ -427,17 +429,44 @@ function botMove(bot) {
         x: food.x - head.x, 
         y: food.y - head.y 
     };
-    const distance = Math.sqrt(foodDist.x * foodDist.x + foodDist.y * foodDist.y) * CELL_SIZE;
+    const distanceToFood = Math.sqrt(foodDist.x * foodDist.x + foodDist.y * foodDist.y) * CELL_SIZE;
+    
+    // Find human player
+    const humanPlayer = players.find(p => !p.isBot && p.alive);
+    let strategy = 'food'; // 'food' or 'attack'
+    
+    if (humanPlayer) {
+        const playerHead = humanPlayer.body[0];
+        const playerDist = {
+            x: playerHead.x - head.x,
+            y: playerHead.y - head.y
+        };
+        const distanceToPlayer = Math.sqrt(playerDist.x * playerDist.x + playerDist.y * playerDist.y);
+        
+        // Strategy decision - attack if close enough and bot is stronger
+        if (distanceToPlayer < 12 && bot.body.length > humanPlayer.body.length + 3) {
+            strategy = 'attack'; // Bot is longer - be aggressive
+        }
+    }
     
     // Autonomous speedup when far from food
     const now = Date.now();
-    if (distance > 200 && now - botLastSpeedup > 2000) {
+    if (distanceToFood > 200 && now - botLastSpeedup > 2000) {
         botSpeedupActive = true;
         botLastSpeedup = now;
         setTimeout(() => { botSpeedupActive = false; }, 1000);
     }
     
-    // Simple pathfinding
+    // Bot can decide to speedup when chasing player or food
+    const shouldSpeedup = Math.random() < 0.15; // 15% chance per move
+    if (shouldSpeedup && !bot.speedUp) {
+        if (strategy === 'attack' || distanceToFood > 150) {
+            bot.speedUp = true;
+            setTimeout(() => { bot.speedUp = false; }, 800 + Math.random() * 600); // 0.8-1.4 seconds
+        }
+    }
+    
+    // Get possible directions
     let possibleDirs = [];
     if (bot.direction.y === 0) {
         possibleDirs.push({ x: 0, y: -1 }, { x: 0, y: 1 });
@@ -445,26 +474,64 @@ function botMove(bot) {
         possibleDirs.push({ x: -1, y: 0 }, { x: 1, y: 0 });
     }
     
-    // Sort by distance to food
-    possibleDirs.sort((a, b) => {
-        const aDist = Math.abs(foodDist.x - a.x) + Math.abs(foodDist.y - a.y);
-        const bDist = Math.abs(foodDist.x - b.x) + Math.abs(foodDist.y - b.y);
-        return aDist - bDist;
-    });
+    // Sort directions based on strategy
+    if (strategy === 'attack' && humanPlayer) {
+        // Move towards player's head to cut them off
+        const playerHead = humanPlayer.body[0];
+        const playerNextPos = {
+            x: playerHead.x + humanPlayer.direction.x * 3,
+            y: playerHead.y + humanPlayer.direction.y * 3
+        };
+        
+        possibleDirs.sort((a, b) => {
+            const aDist = Math.abs(playerNextPos.x - (head.x + a.x)) + 
+                         Math.abs(playerNextPos.y - (head.y + a.y));
+            const bDist = Math.abs(playerNextPos.x - (head.x + b.x)) + 
+                         Math.abs(playerNextPos.y - (head.y + b.y));
+            return aDist - bDist;
+        });
+    } else {
+        // Default: go for food
+        possibleDirs.sort((a, b) => {
+            const aDist = Math.abs(foodDist.x - a.x) + Math.abs(foodDist.y - a.y);
+            const bDist = Math.abs(foodDist.x - b.x) + Math.abs(foodDist.y - b.y);
+            return aDist - bDist;
+        });
+    }
     
-    // Try each direction
+    // Try each direction and pick the safest
     for (let dir of possibleDirs) {
         const newHead = { x: head.x + dir.x, y: head.y + dir.y };
         
+        // Handle wall wrapping
+        if (wallsMode !== 'with_walls') {
+            if (newHead.x < 0) newHead.x = GRID_WIDTH - 1;
+            if (newHead.x >= GRID_WIDTH) newHead.x = 0;
+            if (newHead.y < 0) newHead.y = GRID_HEIGHT - 1;
+            if (newHead.y >= GRID_HEIGHT) newHead.y = 0;
+        }
+        
         // Check if safe
         let safe = true;
+        
+        // Wall collision
         if (wallsMode === 'with_walls') {
-            if (newHead.x < 0 || newHead.x >= GRID_WIDTH || newHead.y < 0 || newHead.y >= GRID_HEIGHT) {
+            if (newHead.x < 0 || newHead.x >= GRID_WIDTH || 
+                newHead.y < 0 || newHead.y >= GRID_HEIGHT) {
                 safe = false;
             }
         }
+        
+        // Self collision
         if (safe && bot.body.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
             safe = false;
+        }
+        
+        // Player collision
+        if (safe && humanPlayer) {
+            if (humanPlayer.body.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+                safe = false;
+            }
         }
         
         if (safe) {
@@ -485,6 +552,19 @@ function update() {
     
     players.forEach(player => {
         if (!player.alive) return;
+        
+        // Update move counter
+        player.moveCounter += speed;
+        
+        // Determine player's move speed
+        const playerSpeed = player.speedUp ? fastSpeed : normalSpeed;
+        
+        // Skip move if not enough time passed for this player
+        if (player.moveCounter < playerSpeed) {
+            return;
+        }
+        
+        player.moveCounter = 0;
         
         // Bot AI
         if (player.isBot) {
@@ -785,9 +865,6 @@ document.addEventListener('keydown', (e) => {
             player.nextDirection = { x: 1, y: 0 };
         } else if (e.key === controls.speed && !player.speedUp) {
             player.speedUp = true;
-            clearInterval(gameLoop);
-            speed = fastSpeed;
-            gameLoop = setInterval(update, speed);
         }
     });
     
@@ -803,9 +880,6 @@ document.addEventListener('keyup', (e) => {
         if (player.isBot) return;
         if (e.key === player.controls.speed && player.speedUp) {
             player.speedUp = false;
-            clearInterval(gameLoop);
-            speed = normalSpeed;
-            gameLoop = setInterval(update, speed);
         }
     });
     

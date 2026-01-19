@@ -1,49 +1,285 @@
-# Snake Game - Игра Змейка
+# 🐍 Snake Game - Modern Classic Reimagined
 
-Полнофункциональная игра "Змейка" с темами, звуками, таблицей лидеров и различными режимами игры.
+A fully-featured Snake game with multiple game modes, themes, sounds, and AI opponent. Available in both **Python Desktop** and **Web Browser** versions.
 
-## Версии игры
+[![Play Now](https://img.shields.io/badge/Play-Online-brightgreen?style=for-the-badge)](https://snakegame-alex.netlify.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/zhirkoalexander-maker/snakegame)
 
-### 🖥️ Десктопная версия (Python + Pygame)
-**Файл:** `snake_game_desktop.py`
+---
 
-Полная версия игры с расширенными функциями:
-- 5 визуальных тем (Classic Dark, Forest Green, Ocean Blue, Neon Purple, Sunset Orange)
-- Звуковые эффекты (еда, золотое яблоко, смерть)
-- Таблица лидеров (топ-10)
-- 3 режима игры: одиночная, против бота, 2 игрока (PvP)
-- Режим стен: с стенами, без стен, телепорт
-- 2 типа еды: обычная (+10 очков), золотая (+30 очков, +3 сегмента)
-- Настраиваемое управление (клавиша C)
-- Ускорение (клавиша Shift)
-- 3-секундный обратный отсчет перед началом игры
-- Независимое автоматическое ускорение бота
+## 🎮 Game Versions
 
-#### Запуск десктопной версии:
+### 🖥️ Desktop Version (Python + Pygame)
+**File:** `snake_game_desktop.py`
+
+Full-featured desktop game with advanced capabilities:
+- **5 Visual Themes** - Classic Dark, Forest Green, Ocean Blue, Neon Purple, Sunset Orange
+- **Sound Effects** - Eat, Golden Apple, Death sounds
+- **Leaderboard** - Top 10 high scores with persistent storage
+- **3 Game Modes:**
+  - 🎯 Single Player - Classic snake gameplay
+  - 🤖 Player vs Bot - Challenge the AI with attack strategies
+  - 👥 Player vs Player (PvP) - Local multiplayer
+- **Wall Modes:**
+  - With Walls - Hit the wall and die
+  - No Walls - Teleport through edges
+- **Food Types:**
+  - 🍎 Normal Apple - +10 points
+  - ⭐ Golden Apple - +30 points, +3 body segments
+- **Advanced Features:**
+  - Customizable controls (press C)
+  - Speed boost (Space/Shift)
+  - 3-second countdown before game start
+  - Bot autonomous speedup and attack AI
+  - Modern settings UI with sections
+  - Rules screen with game instructions
+  - High Score display
+
+#### 🚀 Running Desktop Version:
 ```bash
+# Activate virtual environment
 source .venv/bin/activate
+
+# Install dependencies (if needed)
+pip install pygame numpy
+
+# Run the game
 python snake_game_desktop.py
 ```
 
-#### Требования:
+#### 📋 Requirements:
 - Python 3.13+
 - pygame 2.6.1+
-- numpy 2.4.1+
+- numpy 2.4.1+ (for sound generation)
 
-### 🌐 Веб-версия (JavaScript)
-**Файлы:** `snake_game_web.html`, `snake_game_web.js`
+---
 
-Браузерная версия со всеми основными функциями десктопной версии.
+### 🌐 Web Version (HTML5 + JavaScript)
+**Files:** `index.html`, `snake_game_web.js`
 
-#### Запуск веб-версии:
-Откройте `snake_game_web.html` в браузере или посетите: https://snakegame-alex.netlify.app/
+Browser-based version with all core features:
+- **Responsive Design** - Play on any device
+- **No Installation** - Just open and play
+- **Fullscreen Mode** - Immersive gameplay
+- **Player Indicators** - See who's Player 1, Player 2, or Bot
+- **Snake Textures** - Eyes on head, scale pattern on body
+- **Theme Support** - 5 visual themes
+- **Smart Bot AI:**
+  - Attack mode - Cuts off player when stronger
+  - Food collection - Seeks apples when safe
+  - Independent speed - Player boost doesn't affect bot
 
-## Управление
+#### 🎯 Play Web Version:
+- **Online:** [https://snakegame-alex.netlify.app/](https://snakegame-alex.netlify.app/)
+- **Offline:** Open `index.html` in your browser
 
-- **Стрелки** или **WASD** - движение
-- **Shift** - ускорение
-- **C** - настройка клавиш
-- **Escape** - пауза/меню
+---
 
-## GitHub
-https://github.com/zhirkoalexander-maker/snakegame
+## 🎮 Controls
+
+### Desktop & Web:
+- **Arrow Keys** / **WASD** - Move snake
+- **Space** / **Shift** - Speed boost
+- **C** - Configure controls (desktop only)
+- **F** - Fullscreen (web only)
+- **Escape** - Pause / Back to menu
+
+### PvP Mode:
+- **Player 1:** Arrow Keys + Space
+- **Player 2:** WASD + Ctrl
+
+---
+
+## 🌟 Features
+
+### Visual
+- 5 High-Contrast Themes
+- Animated Snake (eyes, scales, shine)
+- Grid Background
+- Player Color Indicators
+- High Score Display
+- Countdown Timer Overlay
+
+### Audio
+- Sound Effects (Toggle on/off)
+- Eat Apple (440Hz)
+- Golden Apple (880Hz)
+- Death (110Hz)
+
+### Gameplay
+- 3 Game Modes
+- 2 Food Types
+- Wall/No-Wall Modes
+- Speed Boost Mechanic
+- Persistent Leaderboard
+- Auto-save Settings
+
+### AI (Bot Mode)
+- **Attack Strategy** - Pursues player when stronger
+- **Food Collection** - Efficient pathfinding
+- **Autonomous Speedup** - Independent acceleration
+- **Collision Avoidance** - Smart safety checks
+
+---
+
+## 📂 Project Structure
+
+```
+helloworld/
+├── snake_game_desktop.py    # Python desktop version
+├── main.py                   # Desktop entry point
+├── index.html                # Web version HTML
+├── snake_game_web.js         # Web version JavaScript
+├── web/                      # Netlify deployment folder
+│   ├── index.html
+│   └── snake_game_web.js
+├── netlify.toml              # Netlify configuration
+├── DEPLOY.md                 # Deployment instructions
+├── README.md                 # This file
+└── .venv/                    # Python virtual environment
+```
+
+---
+
+## 🚀 Installation & Setup
+
+### Desktop Version:
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/zhirkoalexander-maker/snakegame.git
+cd snakegame
+```
+
+2. **Create virtual environment:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. **Install dependencies:**
+```bash
+pip install pygame numpy
+```
+
+4. **Run the game:**
+```bash
+python snake_game_desktop.py
+```
+
+### Web Version:
+
+**Option 1: Online**
+- Visit: https://snakegame-alex.netlify.app/
+
+**Option 2: Local**
+- Open `index.html` in any modern browser
+
+**Option 3: Deploy to Netlify**
+See [DEPLOY.md](DEPLOY.md) for instructions
+
+---
+
+## 🎨 Themes
+
+1. **Dark** - Classic black background with green grid
+2. **Light** - Light gray background for daytime play
+3. **Neon** - Purple neon glow
+4. **Forest** - Green nature theme
+5. **Ocean** - Deep blue underwater theme
+
+---
+
+## 🏆 Leaderboard
+
+- Automatically saves top 10 scores
+- Stored locally in `~/.snake_game_leaderboard.json`
+- Shows score, game mode, and date
+- Clear records option available
+
+---
+
+## 🔧 Settings Storage
+
+Game settings are persisted in `~/.snake_game_settings.json`:
+- Selected theme
+- Sound on/off
+- Wall mode
+- Custom key bindings
+
+---
+
+## 🤖 Bot AI Behavior
+
+### Strategy Selection:
+- **Attack Mode** - When bot is +3 segments longer than player
+  - Predicts player movement
+  - Cuts off escape routes
+  - Aggressive positioning
+
+- **Food Collection** - Default behavior
+  - Optimal pathfinding to food
+  - Safety-first approach
+  - Avoids risky moves
+
+### Independent Features:
+- Autonomous speedup (distance-based)
+- Does not react to player speed boost
+- Smart collision avoidance
+
+---
+
+## 📱 Browser Compatibility
+
+Tested and working on:
+- ✅ Chrome 90+
+- ✅ Firefox 88+
+- ✅ Safari 14+
+- ✅ Edge 90+
+
+---
+
+## 🔒 Security
+
+- HTTPS enforced on Netlify deployment
+- Secure headers configured
+- No external dependencies in web version
+- Local storage for settings only
+
+---
+
+## 📝 License
+
+This project is open source and available for educational purposes.
+
+---
+
+## 👤 Author
+
+Created with ❤️ using:
+- **Desktop:** Python 3.13 + Pygame 2.6.1
+- **Web:** HTML5 Canvas + Vanilla JavaScript
+
+---
+
+## 🔗 Links
+
+- **Play Online:** [https://snakegame-alex.netlify.app/](https://snakegame-alex.netlify.app/)
+- **GitHub Repository:** [https://github.com/zhirkoalexander-maker/snakegame](https://github.com/zhirkoalexander-maker/snakegame)
+- **Deployment Guide:** [DEPLOY.md](DEPLOY.md)
+
+---
+
+## 🎯 Future Enhancements
+
+- [ ] Mobile touch controls
+- [ ] Multiplayer online mode
+- [ ] More food types and power-ups
+- [ ] Level progression system
+- [ ] Global leaderboard
+- [ ] Achievement system
+- [ ] Custom map editor
+
+---
+
+**Enjoy the game! 🐍🎮**

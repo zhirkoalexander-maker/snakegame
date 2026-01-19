@@ -203,6 +203,24 @@
             color: #00cc00;
             text-decoration: underline;
         }
+        .fullscreen-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .fullscreen-btn:hover {
+            background: rgba(0, 255, 0, 0.4);
+            transform: scale(1.1);
+        }
         /* Themes */
         body.dark {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -222,6 +240,8 @@
     </style>
 </head>
 <body>
+    <button class="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
+    
     <div class="container">
         <h1>🐍 Snake Game 🐍</h1>
         
@@ -290,5 +310,31 @@
     </div>
     
     <script src="snake_game_web.js"></script>
+    <script>
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log('Fullscreen error:', err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+        
+        // Update fullscreen button icon
+        document.addEventListener('fullscreenchange', () => {
+            const btn = document.querySelector('.fullscreen-btn');
+            btn.textContent = document.fullscreenElement ? '⛶' : '⛶';
+        });
+        
+        // Keyboard shortcut F11 or F for fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'f' && !gameRunning) {
+                toggleFullscreen();
+            }
+        });
+    </script>
 </body>
 </html>
