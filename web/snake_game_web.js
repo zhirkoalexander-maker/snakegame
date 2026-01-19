@@ -1,4 +1,4 @@
-const canvas = document.getElementById('gameCanvas');
+ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const CELL_SIZE = 20;
@@ -34,6 +34,28 @@ let foodType = 'normal'; // normal, golden (removed poison)
 let botDifficulty = 'medium';
 let botSpeedupActive = false;
 let botLastSpeedup = 0;
+
+// Bot difficulty settings
+const BOT_DIFFICULTY = {
+    easy: { 
+        attackThreshold: 15, 
+        lengthAdvantage: 8, 
+        speedupChance: 0.05,
+        reactionDelay: 200
+    },
+    medium: { 
+        attackThreshold: 12, 
+        lengthAdvantage: 3, 
+        speedupChance: 0.15,
+        reactionDelay: 100
+    },
+    hard: { 
+        attackThreshold: 10, 
+        lengthAdvantage: 0, 
+        speedupChance: 0.25,
+        reactionDelay: 0
+    }
+};
 
 // Colors and Themes (enhanced contrast)
 const COLOR_OPTIONS = [
@@ -202,6 +224,11 @@ function renderMenu() {
                     <h4>Walls: ${wallsMode === 'with_walls' ? 'Enabled' : 'Disabled'}</h4>
                     <p>${wallsMode === 'with_walls' ? 'Hit walls = death' : 'Teleport through edges'}</p>
                 </div>
+                
+                <div class="menu-option" onclick="nextBotDifficulty()">
+                    <h4>Bot Difficulty: ${botDifficulty.toUpperCase()}</h4>
+                    <p>Click to change (Easy / Medium / Hard)</p>
+                </div>
             </div>
             
             <div class="buttons" style="margin-top: 30px;">
@@ -277,6 +304,14 @@ function nextTheme() {
     const themeColors = THEMES[currentTheme];
     COLORS.background = themeColors.bg;
     COLORS.grid = themeColors.grid;
+    renderMenu();
+}
+
+function nextBotDifficulty() {
+    const difficulties = ['easy', 'medium', 'hard'];
+    const currentIndex = difficulties.indexOf(botDifficulty);
+    const nextIndex = (currentIndex + 1) % difficulties.length;
+    botDifficulty = difficulties[nextIndex];
     renderMenu();
 }
 
@@ -431,6 +466,9 @@ function botMove(bot) {
     };
     const distanceToFood = Math.sqrt(foodDist.x * foodDist.x + foodDist.y * foodDist.y) * CELL_SIZE;
     
+    // Get bot difficulty settings
+    const difficulty = BOT_DIFFICULTY[botDifficulty];
+    
     // Find human player
     const humanPlayer = players.find(p => !p.isBot && p.alive);
     let strategy = 'food'; // 'food' or 'attack'
@@ -443,26 +481,19 @@ function botMove(bot) {
         };
         const distanceToPlayer = Math.sqrt(playerDist.x * playerDist.x + playerDist.y * playerDist.y);
         
-        // Strategy decision - attack if close enough and bot is stronger
-        if (distanceToPlayer < 12 && bot.body.length > humanPlayer.body.length + 3) {
-            strategy = 'attack'; // Bot is longer - be aggressive
+        // Strategy decision - attack based on difficulty
+        if (distanceToPlayer < difficulty.attackThreshold && 
+            bot.body.length > humanPlayer.body.length + difficulty.lengthAdvantage) {
+            strategy = 'attack';
         }
     }
     
-    // Autonomous speedup when far from food
-    const now = Date.now();
-    if (distanceToFood > 200 && now - botLastSpeedup > 2000) {
-        botSpeedupActive = true;
-        botLastSpeedup = now;
-        setTimeout(() => { botSpeedupActive = false; }, 1000);
-    }
-    
     // Bot can decide to speedup when chasing player or food
-    const shouldSpeedup = Math.random() < 0.15; // 15% chance per move
+    const shouldSpeedup = Math.random() < difficulty.speedupChance;
     if (shouldSpeedup && !bot.speedUp) {
         if (strategy === 'attack' || distanceToFood > 150) {
             bot.speedUp = true;
-            setTimeout(() => { bot.speedUp = false; }, 800 + Math.random() * 600); // 0.8-1.4 seconds
+            setTimeout(() => { bot.speedUp = false; }, 800 + Math.random() * 600);
         }
     }
     
@@ -545,16 +576,26 @@ function update() {
     if (!gameRunning) return;
     
     let alivePlayers = players.filter(p => p.alive);
-    if (alivePlayers.length === 0 || (gameMode !== 'single' && alivePlayers.length === 1)) {
+    
+    // Game over conditions
+    if (alivePlayers.length === 0) {
         gameOver();
         return;
+    }
+    
+    // In bot or PvP mode, end game if only one player alive
+    if (gameMode === 'bot' || gameMode === 'pvp') {
+        if (alivePlayers.length === 1) {
+            gameOver();
+            return;
+        }
     }
     
     players.forEach(player => {
         if (!player.alive) return;
         
-        // Update move counter
-        player.moveCounter += speed;
+        // Update move counter with fixed timestep
+        player.moveCounter += 50; // Fixed 50ms per update
         
         // Determine player's move speed
         const playerSpeed = player.speedUp ? fastSpeed : normalSpeed;
@@ -810,9 +851,15 @@ function gameOver() {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('gameOver').classList.remove('hidden');
     
-    // Save to leaderboard
-    const maxScore = Math.max(...players.map(p => p.score));
-    saveScore(maxScore, gameMode);
+    // Save to leaderboard (only player scores, not bot)
+    if (gameMode === 'bot') {
+        // In bot mode, save only the player's score (index 0)
+        saveScore(players[0].score, gameMode);
+    } else {
+        // In single or pvp mode, save the max score
+        const maxScore = Math.max(...players.map(p => p.score));
+        saveScore(maxScore, gameMode);
+    }
     
     if (gameMode !== 'single') {
         const alivePlayers = players.filter(p => p.alive);

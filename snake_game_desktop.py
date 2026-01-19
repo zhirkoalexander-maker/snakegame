@@ -11,6 +11,12 @@ class Snake:
         self.alive = True
         self.score = 0
         self.bot_speedup = False  # Бот решает сам когда ускоряться
+        # Power-up система
+        self.apples_collected = 0  # Счетчик собранных яблок
+        self.active_powerups = []  # Список активных power-ups: [{'type': 'shield', 'end_time': time}, ...]
+        self.invincible = False  # Неуязвимость
+        self.ghost_mode = False  # Проход сквозь стены
+        self.magnet_range = 0  # Радиус притяжения яблок (0 = выключено)
 
     def get_head(self):
         return self.body[0]
@@ -51,12 +57,17 @@ class Snake:
         head = self.get_head()
         # Нормализуем координаты головы к сетке
         head_grid = ((head[0] // CELL_SIZE) * CELL_SIZE, (head[1] // CELL_SIZE) * CELL_SIZE)
-        # Серые стены убивают только если walls_enabled=True
-        if walls_enabled and head_grid in walls:
+        
+        # Проверка неуязвимости
+        if self.invincible:
+            return  # Не умираем от столкновений
+        
+        # Серые стены убивают только если walls_enabled=True и нет ghost_mode
+        if walls_enabled and head_grid in walls and not self.ghost_mode:
             self.alive = False
             return
-        # Границы убивают только если wrap_around == False
-        if not wrap_around:
+        # Границы убивают только если wrap_around == False и нет ghost_mode
+        if not wrap_around and not self.ghost_mode:
             if field_width is None:
                 field_width = 600
             if field_height is None:
@@ -79,6 +90,9 @@ class Snake:
                     return
 
     def draw(self, screen):
+        import math
+        current_time = pygame.time.get_ticks()
+        
         for i, segment in enumerate(self.body):
             # Рисуем строго по сетке
             x = (segment[0] // CELL_SIZE) * CELL_SIZE
@@ -91,9 +105,23 @@ class Snake:
             offset = (CELL_SIZE - segment_size) // 2
             
             # Основной цвет с затемнением для тела
+            color = self.color
+            
+            # Эффекты активных power-ups
+            if self.invincible:
+                # Щит - золотое свечение
+                pulse = int(50 * abs(math.sin(current_time / 200)))
+                color = tuple(min(255, c + pulse) for c in [255, 215, 0])
+            elif self.ghost_mode:
+                # Призрак - полупрозрачный синий
+                color = (100, 100, 255)
+            elif self.magnet_range > 0 and i == 0:
+                # Магнит - фиолетовое свечение на голове
+                pulse = int(40 * abs(math.sin(current_time / 150)))
+                color = tuple(min(255, c + pulse) for c in [200, 0, 255])
+            
             if i == 0:
                 # Голова - ярче
-                color = self.color
                 # Рисуем обводку
                 pygame.draw.rect(screen, (0, 0, 0), (x, y, CELL_SIZE, CELL_SIZE), 2)
                 # Основной прямоугольник
@@ -101,6 +129,21 @@ class Snake:
                 # Блик
                 highlight_color = tuple(min(255, c + 60) for c in color)
                 pygame.draw.rect(screen, highlight_color, (x + 4, y + 4, CELL_SIZE // 3, CELL_SIZE // 3))
+                
+                # Эффект щита вокруг головы
+                if self.invincible:
+                    shield_pulse = int(3 + 2 * abs(math.sin(current_time / 150)))
+                    pygame.draw.circle(screen, (255, 215, 0), (x + CELL_SIZE // 2, y + CELL_SIZE // 2), CELL_SIZE // 2 + shield_pulse, 3)
+                    pygame.draw.circle(screen, (255, 255, 100), (x + CELL_SIZE // 2, y + CELL_SIZE // 2), CELL_SIZE // 2 + shield_pulse + 2, 1)
+                
+                # Эффект магнита
+                if self.magnet_range > 0:
+                    for angle in range(0, 360, 45):
+                        rad = math.radians(angle + (current_time / 10) % 360)
+                        spark_x = x + CELL_SIZE // 2 + int(12 * math.cos(rad))
+                        spark_y = y + CELL_SIZE // 2 + int(12 * math.sin(rad))
+                        pygame.draw.circle(screen, (200, 0, 255), (spark_x, spark_y), 2)
+                
                 # Глаза
                 eye_color = (255, 255, 255)
                 pygame.draw.circle(screen, eye_color, (x + 6, y + 8), 3)
@@ -109,7 +152,8 @@ class Snake:
                 pygame.draw.circle(screen, (0, 0, 0), (x + CELL_SIZE - 6, y + 8), 1)
             else:
                 # Тело - темнее и сужается
-                color = tuple(max(0, c - 30) for c in self.color)
+                if not (self.invincible or self.ghost_mode or self.magnet_range > 0):
+                    color = tuple(max(0, c - 30) for c in self.color)
                 # Обводка
                 pygame.draw.rect(screen, (0, 0, 0), (x + offset, y + offset, segment_size, segment_size), 1)
                 # Основной прямоугольник со скругленными углами
@@ -242,7 +286,7 @@ class Menu:
         ]
         self.colors = [GREEN, BLUE, RED, (255,255,0), (255,0,255), (0,255,255), (255,128,0), (128,0,255), (0,255,128)]
         self.color_names = ["Green", "Blue", "Red", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Aqua"]
-        self.modes = ["Single", "PvP", "Bot"]
+        self.modes = ["Single", "PvP", "Bot", "Power-Up"]
         self.walls_types = ["With walls", "No walls"]
         self.selected = 0
         self.step = 'start'  # 'start', 'mode', 'walls', 'level', 'color', 'controls', 'settings', 'leaderboard'
@@ -904,6 +948,14 @@ class Menu:
                         self.selected = (self.selected - 1) % len(self.modes)
                     elif event.key == pygame.K_DOWN:
                         self.selected = (self.selected + 1) % len(self.modes)
+                    elif event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4]:
+                        # Выбор режима цифрами 1-4
+                        mode_index = event.key - pygame.K_1
+                        if mode_index < len(self.modes):
+                            self.selected_mode = mode_index
+                            self.step = 'walls'
+                            self.selected = 0
+                            return 'next'
                     elif event.key == pygame.K_RETURN:
                         self.selected_mode = self.selected
                         self.step = 'walls'
@@ -1106,6 +1158,10 @@ class SnakeGame:
             # Объединяем оба набора для одиночной игры
             controls = {**p1_controls, **p2_controls}
             self.snakes.append(Snake((WIDTH // 2, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls=controls))
+        elif mode == 'power-up':
+            # Power-Up режим - одиночный игрок с системой способностей
+            controls = {**p1_controls, **p2_controls}
+            self.snakes.append(Snake((WIDTH // 2, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls=controls))
         elif mode == 'pvp':
             self.snakes.append(Snake((WIDTH // 4, HEIGHT // 2), (CELL_SIZE, 0), snake_color, controls=p2_controls))
             self.snakes.append(Snake((3*WIDTH // 4, HEIGHT // 2), (-CELL_SIZE, 0), self.bot_color, controls=p1_controls))
@@ -1124,6 +1180,14 @@ class SnakeGame:
         self.game_active = False  # Игра активна после обратного отсчета
         self.countdown_start = None  # Время начала обратного отсчета
         self.game_active = False  # Игра активна после обратного отсчета
+        
+        # Power-Up система
+        self.powerup_selection_mode = False  # Режим выбора силы
+        self.available_powerups = []  # Список доступных сил для выбора
+        self.selected_powerup_index = 0  # Индекс выбранной силы
+        
+        # Пауза
+        self.paused = False
 
     def random_food(self):
         while True:
@@ -1140,6 +1204,42 @@ class SnakeGame:
             tail = self.snake[-1]
             new_segment = (tail[0], tail[1])  # Пока на месте хвоста, но move сдвинет
             self.snake.append(new_segment)
+    
+    def apply_powerup(self, powerup_type):
+        """Применяет выбранную силу к змее игрока"""
+        snake = self.snakes[0]  # Игрок всегда первая змея в power-up режиме
+        current_time = pygame.time.get_ticks()
+        
+        print(f"Applying powerup: {powerup_type}")  # Отладка
+        
+        if powerup_type == 'shield':
+            # Неуязвимость на 10 секунд
+            snake.invincible = True
+            snake.active_powerups.append({'type': 'shield', 'end_time': current_time + 10000})
+            print(f"Shield activated! invincible={snake.invincible}")
+        elif powerup_type == 'ghost':
+            # Проход сквозь стены на 8 секунд
+            snake.ghost_mode = True
+            snake.active_powerups.append({'type': 'ghost', 'end_time': current_time + 8000})
+            print(f"Ghost activated! ghost_mode={snake.ghost_mode}")
+        elif powerup_type == 'magnet':
+            # Магнит притягивает яблоки на 12 секунд
+            snake.magnet_range = 150  # радиус притяжения в пикселях
+            snake.active_powerups.append({'type': 'magnet', 'end_time': current_time + 12000})
+            print(f"Magnet activated! magnet_range={snake.magnet_range}")
+        elif powerup_type == 'speed':
+            # Ускорение на 7 секунд
+            original_delay = self.move_delay
+            self.move_delay = max(10, self.move_delay // 2)
+            snake.active_powerups.append({'type': 'speed', 'end_time': current_time + 7000, 'original_delay': original_delay})
+            print(f"Speed activated! delay={self.move_delay}")
+        elif powerup_type == 'shrink':
+            # Уменьшить змею на 3 сегмента (минимум 1)
+            segments_to_remove = min(3, len(snake.body) - 1)
+            for _ in range(segments_to_remove):
+                if len(snake.body) > 1:
+                    snake.body.pop()
+            print(f"Shrink activated! removed {segments_to_remove} segments, new length={len(snake.body)}")
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -1150,8 +1250,22 @@ class SnakeGame:
                     # Возврат в меню
                     self.game_started = False
                     return
+                elif event.key == pygame.K_p:
+                    # Пауза
+                    self.paused = not self.paused
+                    return
+                # Режим выбора Power-Up
+                if self.powerup_selection_mode:
+                    if event.key == pygame.K_LEFT:
+                        self.selected_powerup_index = (self.selected_powerup_index - 1) % len(self.available_powerups)
+                    elif event.key == pygame.K_RIGHT:
+                        self.selected_powerup_index = (self.selected_powerup_index + 1) % len(self.available_powerups)
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                        # Применяем выбранную силу
+                        self.apply_powerup(self.available_powerups[self.selected_powerup_index])
+                        self.powerup_selection_mode = False
                 # Обрабатываем клавиши направления только когда игра активна (после обратного отсчета)
-                if self.game_active:
+                elif self.game_active:
                     for snake in self.snakes:
                         if not snake.is_bot:
                             snake.set_direction(event.key)
@@ -1200,6 +1314,43 @@ class SnakeGame:
             head = snake.get_head()
             head_grid = (head[0] // CELL_SIZE * CELL_SIZE, head[1] // CELL_SIZE * CELL_SIZE)
             food_grid = (self.food['pos'][0] // CELL_SIZE * CELL_SIZE, self.food['pos'][1] // CELL_SIZE * CELL_SIZE)
+            
+            # Проверка магнита (power-up) - собираем яблоко на расстоянии
+            if snake.magnet_range > 0:
+                distance = ((head[0] - self.food['pos'][0])**2 + (head[1] - self.food['pos'][1])**2)**0.5
+                if distance <= snake.magnet_range:
+                    # Собираем яблоко сразу, не притягивая
+                    food_type = self.food['type']
+                    
+                    if food_type == 'gold':
+                        points = 30
+                        growth = 3
+                        if self.settings['sound']:
+                            play_sound('golden')
+                    else:  # normal
+                        points = 10
+                        growth = 1
+                        if self.settings['sound']:
+                            play_sound('eat')
+                    
+                    snake.score += points
+                    snake.grow(growth)
+                    
+                    # Power-Up режим: счетчик яблок
+                    if self.mode == 'power-up':
+                        snake.apples_collected += 1
+                        if snake.apples_collected % 3 == 0:
+                            # Каждые 3 яблока - выбор силы
+                            self.powerup_selection_mode = True
+                            # Генерируем 3 случайные силы
+                            all_powerups = ['shield', 'ghost', 'magnet', 'speed', 'shrink']
+                            self.available_powerups = random.sample(all_powerups, 3)
+                            self.selected_powerup_index = 0
+                    
+                    self.food = self.random_food()
+                    break  # Выходим из цикла, яблоко собрано
+            
+            # Обычный сбор яблока при контакте
             if head_grid == food_grid:
                 food_type = self.food['type']
                 
@@ -1217,7 +1368,40 @@ class SnakeGame:
                 snake.score += points
                 snake.grow(growth)
                 
+                # Power-Up режим: счетчик яблок
+                if self.mode == 'power-up':
+                    snake.apples_collected += 1
+                    if snake.apples_collected % 3 == 0:
+                        # Каждые 3 яблока - выбор силы
+                        self.powerup_selection_mode = True
+                        # НЕ останавливаем игру - можно выбирать на ходу!
+                        # Генерируем 3 случайные силы
+                        all_powerups = ['shield', 'ghost', 'magnet', 'speed', 'shrink']
+                        self.available_powerups = random.sample(all_powerups, 3)
+                        self.selected_powerup_index = 0
+                
                 self.food = self.random_food()
+        
+        # Обновление активных power-ups (проверка истечения времени)
+        if self.mode == 'power-up':
+            current_time = pygame.time.get_ticks()
+            snake = self.snakes[0]
+            expired = []
+            for powerup in snake.active_powerups:
+                if current_time >= powerup['end_time']:
+                    expired.append(powerup)
+                    # Отключаем эффект
+                    if powerup['type'] == 'shield':
+                        snake.invincible = False
+                    elif powerup['type'] == 'ghost':
+                        snake.ghost_mode = False
+                    elif powerup['type'] == 'magnet':
+                        snake.magnet_range = 0
+                    elif powerup['type'] == 'speed':
+                        self.move_delay = powerup['original_delay']
+            for powerup in expired:
+                snake.active_powerups.remove(powerup)
+        
         if not any(s.alive for s in self.snakes):
             if self.settings['sound']:
                 play_sound('death')
@@ -1232,7 +1416,7 @@ class SnakeGame:
                     other.alive = False
                     if self.settings['sound']:
                         play_sound('death')
-        if self.mode in ('single', 'bot', 'pvp'):
+        if self.mode in ('single', 'bot', 'pvp', 'power-up'):
             if not self.snakes[0].alive or (len(self.snakes) > 1 and not self.snakes[1].alive):
                 if self.settings['sound']:
                     play_sound('death')
@@ -1256,6 +1440,33 @@ class SnakeGame:
         high_score = leaderboard[0]['score'] if leaderboard else 0
         high_score_text = font.render(f"High Score: {high_score}", True, GOLD)
         self.screen.blit(high_score_text, (10, 10))
+        
+        # Power-Up режим: показываем счетчик яблок и активные силы (ВНИЗУ экрана)
+        if self.mode == 'power-up' and len(self.snakes) > 0:
+            snake = self.snakes[0]
+            apples_font = pygame.font.SysFont(None, 32)
+            screen_height = self.screen.get_height()
+            
+            # Счетчик яблок внизу слева
+            apples_until_powerup = 3 - (snake.apples_collected % 3)
+            apples_text = apples_font.render(f"Apples until power: {apples_until_powerup}", True, (255, 200, 100))
+            self.screen.blit(apples_text, (10, screen_height - 45))
+            
+            # Показываем активные силы внизу (над счетчиком яблок)
+            y_offset = screen_height - 85
+            for powerup in snake.active_powerups:
+                current_time = pygame.time.get_ticks()
+                remaining = (powerup['end_time'] - current_time) / 1000.0
+                powerup_names = {
+                    'shield': '🛡️ Shield',
+                    'ghost': '👻 Ghost',
+                    'magnet': '🧲 Magnet',
+                    'speed': '⚡ Speed'
+                }
+                powerup_name = powerup_names.get(powerup['type'], powerup['type'])
+                powerup_text = apples_font.render(f"{powerup_name}: {remaining:.1f}s", True, (100, 255, 100))
+                self.screen.blit(powerup_text, (10, y_offset))
+                y_offset -= 35
         
         # Отображение обратного отсчета
         if not self.game_active and self.countdown_start is not None:
@@ -1310,6 +1521,23 @@ class SnakeGame:
         for snake in self.snakes:
             snake.draw(self.screen)
         
+        # Эффект магнита - показываем радиус притяжения
+        if self.mode == 'power-up' and len(self.snakes) > 0:
+            snake = self.snakes[0]
+            if snake.magnet_range > 0:
+                import math
+                current_time = pygame.time.get_ticks()
+                head = snake.get_head()
+                head_x = (head[0] // CELL_SIZE) * CELL_SIZE + CELL_SIZE // 2
+                head_y = (head[1] // CELL_SIZE) * CELL_SIZE + CELL_SIZE // 2
+                # Пульсирующий круг радиуса притяжения
+                pulse = int(10 * abs(math.sin(current_time / 300)))
+                for radius in range(snake.magnet_range - pulse, snake.magnet_range, 15):
+                    if radius > 0:
+                        alpha_surface = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
+                        pygame.draw.circle(alpha_surface, (200, 0, 255, 30), (head_x, head_y), radius, 2)
+                        self.screen.blit(alpha_surface, (0, 0))
+        
         # Рисуем еду
         fx = (self.food['pos'][0] // CELL_SIZE) * CELL_SIZE
         fy = (self.food['pos'][1] // CELL_SIZE) * CELL_SIZE
@@ -1346,6 +1574,112 @@ class SnakeGame:
             (fx + CELL_SIZE // 2 + 3, fy + 6)
         ]
         pygame.draw.polygon(self.screen, leaf_color, leaf_points)
+        
+        # Экран паузы
+        if self.paused:
+            screen_width = self.screen.get_width()
+            screen_height = self.screen.get_height()
+            overlay = pygame.Surface((screen_width, screen_height))
+            overlay.set_alpha(180)
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+            
+            pause_font = pygame.font.SysFont(None, 120)
+            pause_text = pause_font.render("PAUSED", True, (255, 255, 0))
+            pause_rect = pause_text.get_rect(center=(screen_width // 2, screen_height // 2 - 50))
+            self.screen.blit(pause_text, pause_rect)
+            
+            info_font = pygame.font.SysFont(None, 40)
+            info_text = info_font.render("Press P to resume", True, WHITE)
+            info_rect = info_text.get_rect(center=(screen_width // 2, screen_height // 2 + 50))
+            self.screen.blit(info_text, info_rect)
+            
+            esc_text = info_font.render("Press ESC to return to menu", True, (200, 200, 200))
+            esc_rect = esc_text.get_rect(center=(screen_width // 2, screen_height // 2 + 100))
+            self.screen.blit(esc_text, esc_rect)
+        
+        # Меню выбора Power-Up
+        if self.powerup_selection_mode:
+            import math
+            current_time = pygame.time.get_ticks()
+            
+            # Полупрозрачный фон с пульсацией
+            screen_width = self.screen.get_width()
+            screen_height = self.screen.get_height()
+            overlay = pygame.Surface((screen_width, screen_height))
+            alpha = 150 + int(50 * abs(math.sin(current_time / 500)))
+            overlay.set_alpha(alpha)
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+            
+            # Заголовок с анимацией
+            title_font = pygame.font.SysFont(None, 72)
+            scale = 1.0 + 0.1 * abs(math.sin(current_time / 300))
+            title_size = int(72 * scale)
+            title_font_scaled = pygame.font.SysFont(None, title_size)
+            title = title_font_scaled.render("Choose Your Power!", True, GOLD)
+            title_rect = title.get_rect(center=(screen_width // 2, screen_height // 4))
+            self.screen.blit(title, title_rect)
+            
+            # Описания сил
+            powerup_descriptions = {
+                'shield': ('🛡️ Shield', 'Invincibility for 10 seconds'),
+                'ghost': ('👻 Ghost Mode', 'Pass through walls for 8 seconds'),
+                'magnet': ('🧲 Magnet', 'Attract apples for 12 seconds'),
+                'speed': ('⚡ Speed Boost', 'Move faster for 7 seconds'),
+                'shrink': ('✂️ Shrink', 'Remove 3 segments instantly')
+            }
+            
+            # Рисуем карточки сил
+            card_width = 250
+            card_height = 200
+            spacing = 30
+            total_width = len(self.available_powerups) * card_width + (len(self.available_powerups) - 1) * spacing
+            start_x = (screen_width - total_width) // 2
+            y = screen_height // 2 - 50
+            
+            for i, powerup in enumerate(self.available_powerups):
+                x = start_x + i * (card_width + spacing)
+                
+                # Анимация для выбранной карточки
+                if i == self.selected_powerup_index:
+                    card_offset_y = int(10 * abs(math.sin(current_time / 200)))
+                    card_color = (100, 200, 100)
+                    border_color = (150, 255, 150)
+                    border_width = 5
+                    # Добавляем свечение
+                    glow_surface = pygame.Surface((card_width + 20, card_height + 20), pygame.SRCALPHA)
+                    glow_alpha = int(100 * abs(math.sin(current_time / 250)))
+                    pygame.draw.rect(glow_surface, (150, 255, 150, glow_alpha), (0, 0, card_width + 20, card_height + 20), border_radius=10)
+                    self.screen.blit(glow_surface, (x - 10, y - card_offset_y - 10))
+                else:
+                    card_offset_y = 0
+                    card_color = (60, 60, 60)
+                    border_color = (100, 100, 100)
+                    border_width = 2
+                
+                # Рисуем карточку
+                pygame.draw.rect(self.screen, card_color, (x, y - card_offset_y, card_width, card_height))
+                pygame.draw.rect(self.screen, border_color, (x, y - card_offset_y, card_width, card_height), border_width)
+                
+                # Название силы
+                name, description = powerup_descriptions[powerup]
+                name_font = pygame.font.SysFont(None, 48)
+                name_text = name_font.render(name, True, WHITE)
+                name_rect = name_text.get_rect(center=(x + card_width // 2, y - card_offset_y + 60))
+                self.screen.blit(name_text, name_rect)
+                
+                # Описание
+                desc_font = pygame.font.SysFont(None, 28)
+                desc_text = desc_font.render(description, True, (200, 200, 200))
+                desc_rect = desc_text.get_rect(center=(x + card_width // 2, y - card_offset_y + 130))
+                self.screen.blit(desc_text, desc_rect)
+            
+            # Инструкции
+            inst_font = pygame.font.SysFont(None, 36)
+            inst_text = inst_font.render("← → to select, ENTER to choose", True, WHITE)
+            inst_rect = inst_text.get_rect(center=(screen_width // 2, screen_height - 100))
+            self.screen.blit(inst_text, inst_rect)
         
         pygame.display.flip()
 
@@ -1416,7 +1750,7 @@ class SnakeGame:
 
     async def show_game_over(self):
         # Сохраняем результат в таблицу лидеров
-        if self.mode == 'single' and self.snakes[0].score > 0:
+        if self.mode in ('single', 'power-up') and self.snakes[0].score > 0:
             add_score_to_leaderboard('Player', self.snakes[0].score)
         
         # Определяем победителя и причину
@@ -1424,8 +1758,8 @@ class SnakeGame:
         win_text = None
         win_color = WHITE
         scores = [snake.score for snake in self.snakes]
-        # Для одиночного режима — если жив, то YOU WIN, если мертв — YOU LOSE
-        if self.mode == "single":
+        # Для одиночного режима и power-up — если жив, то YOU WIN, если мертв — YOU LOSE
+        if self.mode in ("single", "power-up"):
             if self.snakes[0].alive:
                 winner = 0
                 win_text = "YOU WIN"
@@ -1534,10 +1868,10 @@ class SnakeGame:
             self.handle_events()
             # Проверка на возврат в меню по Escape
             if not self.game_started:
-                return 'menu'
+                return 'menu'  # Выходим сразу, не показывая game over
             
-            # Движение только после завершения обратного отсчета
-            if self.game_active:
+            # Движение только после завершения обратного отсчета и если не на паузе и не выбираем power-up
+            if self.game_active and not self.paused and not self.powerup_selection_mode:
                 # Ускорение змейки при удержании клавиш ускорения (только для игроков, НЕ для бота)
                 speedup = False
                 keys = pygame.key.get_pressed()
@@ -1556,6 +1890,7 @@ class SnakeGame:
             await asyncio.sleep(0)
             self.clock.tick(FPS)
 
+        # Показываем game over только если игра закончилась, а не был выход в меню
         return await self.show_game_over()
 
 async def main():
