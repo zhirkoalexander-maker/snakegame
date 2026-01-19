@@ -585,6 +585,27 @@ function draw() {
     ctx.textAlign = 'left';
     ctx.fillText('High Score: ' + highScore, 10, 20);
     
+    // Draw player indicators
+    if (players.length > 0 && gameRunning) {
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 14px Arial';
+        
+        // Player 1 indicator
+        if (players[0] && players[0].alive) {
+            ctx.fillStyle = players[0].color;
+            ctx.fillText('● Player 1', canvas.width - 10, 20);
+        }
+        
+        // Player 2 / Bot indicator
+        if (players.length > 1 && players[1] && players[1].alive) {
+            ctx.fillStyle = players[1].color;
+            const label = players[1].isBot ? '● Bot' : '● Player 2';
+            ctx.fillText(label, canvas.width - 10, 40);
+        }
+        
+        ctx.textAlign = 'left';
+    }
+    
     // Draw walls if enabled
     if (wallsMode === 'with_walls') {
         ctx.strokeStyle = '#ff0000';
@@ -592,28 +613,60 @@ function draw() {
         ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
     }
     
-    // Draw players
-    players.forEach(player => {
+    // Draw players with textures
+    players.forEach((player, playerIndex) => {
         if (!player.alive) return;
         
         player.body.forEach((segment, index) => {
-            ctx.fillStyle = index === 0 ? player.color : player.color + 'cc';
-            ctx.fillRect(
-                segment.x * CELL_SIZE + 1,
-                segment.y * CELL_SIZE + 1,
-                CELL_SIZE - 2,
-                CELL_SIZE - 2
-            );
+            const x = segment.x * CELL_SIZE;
+            const y = segment.y * CELL_SIZE;
             
-            // Highlight on head
             if (index === 0) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.fillRect(
-                    segment.x * CELL_SIZE + 3,
-                    segment.y * CELL_SIZE + 3,
-                    CELL_SIZE - 10,
-                    CELL_SIZE - 10
-                );
+                // Draw head with eyes
+                ctx.fillStyle = player.color;
+                ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                
+                // Head shine
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fillRect(x + 3, y + 3, CELL_SIZE - 10, CELL_SIZE - 10);
+                
+                // Eyes
+                ctx.fillStyle = '#000';
+                const eyeSize = 3;
+                const eyeOffset = 5;
+                
+                // Determine eye position based on direction
+                if (player.direction.x === 1) { // Right
+                    ctx.fillRect(x + CELL_SIZE - eyeOffset - eyeSize, y + 5, eyeSize, eyeSize);
+                    ctx.fillRect(x + CELL_SIZE - eyeOffset - eyeSize, y + CELL_SIZE - 8, eyeSize, eyeSize);
+                } else if (player.direction.x === -1) { // Left
+                    ctx.fillRect(x + eyeOffset, y + 5, eyeSize, eyeSize);
+                    ctx.fillRect(x + eyeOffset, y + CELL_SIZE - 8, eyeSize, eyeSize);
+                } else if (player.direction.y === -1) { // Up
+                    ctx.fillRect(x + 5, y + eyeOffset, eyeSize, eyeSize);
+                    ctx.fillRect(x + CELL_SIZE - 8, y + eyeOffset, eyeSize, eyeSize);
+                } else { // Down
+                    ctx.fillRect(x + 5, y + CELL_SIZE - eyeOffset - eyeSize, eyeSize, eyeSize);
+                    ctx.fillRect(x + CELL_SIZE - 8, y + CELL_SIZE - eyeOffset - eyeSize, eyeSize, eyeSize);
+                }
+            } else {
+                // Draw body with scale pattern
+                ctx.fillStyle = player.color + 'cc';
+                ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                
+                // Scale texture
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.beginPath();
+                ctx.arc(x + CELL_SIZE / 2, y + CELL_SIZE / 2, CELL_SIZE / 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Additional pattern lines
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + 2, y + CELL_SIZE / 2);
+                ctx.lineTo(x + CELL_SIZE - 2, y + CELL_SIZE / 2);
+                ctx.stroke();
             }
         });
     });
