@@ -62,18 +62,32 @@ class Snake:
         if self.invincible:
             return  # Не умираем от столкновений
         
-        # Бот не может самоубиться - только игрок может его убить
+        # Бот не умирает от столкновения с собой (умеет обходить)
         if self.is_bot:
-            # Бот умирает только от столкновения с игроком
+            # Бот умирает от стен и игрока, но НЕ от себя
+            # Проверка стен
+            if walls_enabled and head_grid in walls and not self.ghost_mode:
+                self.alive = False
+                return
+            # Проверка границ
+            if not wrap_around and not self.ghost_mode:
+                if field_width is None:
+                    field_width = 600
+                if field_height is None:
+                    field_height = 600
+                if head[0] < 0 or head[0] >= field_width or head[1] < 0 or head[1] >= field_height:
+                    self.alive = False
+                    return
+            # Проверка столкновения с игроком
             for snake in snakes:
-                if snake is not self and not snake.is_bot:  # Проверяем столкновение только с игроком
+                if snake is not self:
                     if head == snake.get_head():
                         self.alive = False
                         return
                     elif head in snake.body[1:]:
                         self.alive = False
                         return
-            # Бот НЕ умирает от стен, границ и себя - просто выходим
+            # Бот НЕ проверяет столкновение с собой (head in self.body[1:])
             return
         
         # Для игрока (не бота) - обычные правила
@@ -1734,8 +1748,12 @@ class SnakeGame:
             if pos_grid in walls_grid:
                 continue
             
-            # Проверка столкновения с собой
+            # Проверка столкновения с собой (бот избегает сам себя)
             if (nx, ny) in snake.body:
+                continue
+            
+            # Проверка столкновения с игроком
+            if (nx, ny) in player.body:
                 continue
                 
             # Проверка границ (если есть)
