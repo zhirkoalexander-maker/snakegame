@@ -1,0 +1,21 @@
+{
+  "install": "npm install",
+  "start": "node server.js",
+  "watch": {
+    "ignore": [
+      "\\.git",
+      "node_modules"
+    ],
+    "install": {
+      "include": [
+        "^package\\.json$",
+        "^package-lock\\.json$"
+      ]
+    },
+    "restart": {
+      "include": [
+        "\\.js$"
+      ]
+    }
+  }
+}

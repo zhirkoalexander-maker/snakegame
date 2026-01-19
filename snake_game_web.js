@@ -21,6 +21,14 @@ let countdown = 0;
 let countdownInterval = null;
 let highScore = 0;
 
+// Multiplayer
+const SERVER_URL = 'wss://snake-multiplayer-server.glitch.me'; // Change to your Glitch URL
+let ws = null;
+let multiplayerRoomId = null;
+let multiplayerPlayerId = null;
+let multiplayerPlayers = [];
+let playerName = '';
+
 // Menu
 let menuStep = 'mode';
 const menuSteps = ['mode', 'settings', 'rules', 'color', 'start'];
@@ -196,6 +204,10 @@ function renderMenu() {
                 <h4>👥 Player vs Player</h4>
                 <p>Compete with a friend!</p>
             </div>
+            <div class="menu-option" onclick="selectMode('multiplayer')">
+                <h4>🌐 Online Multiplayer</h4>
+                <p>Play with others online!</p>
+            </div>
             <div class="buttons" style="margin-top: 20px;">
                 <button class="btn-secondary" onclick="showLeaderboard()">🏆 Leaderboard</button>
                 <button class="btn-secondary" onclick="menuStep='settings'; renderMenu()">⚙️ Settings</button>
@@ -331,8 +343,12 @@ function selectTheme(theme) {
 
 function selectMode(mode) {
     gameMode = mode;
-    menuStep = 'color';
-    renderMenu();
+    if (mode === 'multiplayer') {
+        showMultiplayerMenu();
+    } else {
+        menuStep = 'color';
+        renderMenu();
+    }
 }
 
 function selectColor(color) {
@@ -931,6 +947,357 @@ document.addEventListener('keyup', (e) => {
     });
     
     e.preventDefault();
+});
+
+// ============= MULTIPLAYER FUNCTIONS =============
+
+function showMultiplayerMenu() {
+    const menuContent = document.getElementById('menuContent');
+    menuContent.innerHTML = `
+        <h3 style="color: #00ff00; margin-bottom: 20px;">🌐 Online Multiplayer</h3>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <input type="text" id="playerNameInput" placeholder="Enter your name" 
+                   style="padding: 10px; font-size: 16px; border: 2px solid #00ff00; 
+                          background: #000; color: #00ff00; border-radius: 5px; width: 250px;"
+                   maxlength="15" value="${playerName}">
+        </div>
+        
+        <div class="menu-option" onclick="createRoom()">
+            <h4>🎮 Create Room</h4>
+            <p>Start a new multiplayer game</p>
+        </div>
+        
+        <div class="menu-option" onclick="showRoomList()">
+            <h4>🔍 Join Room</h4>
+            <p>Browse available rooms</p>
+        </div>
+        
+        <div id="roomListContainer"></div>
+        <div id="multiplayerStatus" style="color: #ffff00; margin-top: 20px;"></div>
+        
+        <div class="buttons" style="margin-top: 30px;">
+            <button class="btn-secondary" onclick="menuStep='mode'; renderMenu()">← Back</button>
+        </div>
+    `;
+}
+
+function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) return Promise.resolve();
+    
+    return new Promise((resolve, reject) => {
+        ws = new WebSocket(SERVER_URL);
+        
+        ws.onopen = () => {
+            document.getElementById('multiplayerStatus').textContent = '✅ Connected to server';
+            document.getElementById('multiplayerStatus').style.color = '#00ff00';
+            resolve();
+        };
+        
+        ws.onerror = () => {
+            document.getElementById('multiplayerStatus').textContent = '❌ Connection error';
+            document.getElementById('multiplayerStatus').style.color = '#ff0000';
+            reject(new Error('WebSocket connection failed'));
+        };
+        
+        ws.onclose = () => {
+            if (gameMode === 'multiplayer' && gameState === 'playing') {
+                endGame();
+                alert('Lost connection to server');
+            }
+        };
+        
+        ws.onmessage = (event) => {
+            handleServerMessage(JSON.parse(event.data));
+        };
+    });
+}
+
+function createRoom() {
+    playerName = document.getElementById('playerNameInput').value.trim() || 'Player';
+    
+    connectWebSocket().then(() => {
+        ws.send(JSON.stringify({
+            type: 'create_room',
+            playerName: playerName
+        }));
+    }).catch(err => {
+        alert('Cannot connect to server. Please try again later.');
+    });
+}
+
+function showRoomList() {
+    playerName = document.getElementById('playerNameInput').value.trim() || 'Player';
+    
+    connectWebSocket().then(() => {
+        ws.send(JSON.stringify({
+            type: 'list_rooms'
+        }));
+    }).catch(err => {
+        alert('Cannot connect to server. Please try again later.');
+    });
+}
+
+function joinRoom(roomId) {
+    ws.send(JSON.stringify({
+        type: 'join_room',
+        roomId: roomId,
+        playerName: playerName
+    }));
+}
+
+function leaveRoom() {
+    if (ws && multiplayerRoomId) {
+        ws.send(JSON.stringify({
+            type: 'leave_room'
+        }));
+    }
+    multiplayerRoomId = null;
+    multiplayerPlayerId = null;
+    multiplayerPlayers = [];
+    showMultiplayerMenu();
+}
+
+function startMultiplayerGame() {
+    if (!multiplayerRoomId) return;
+    
+    ws.send(JSON.stringify({
+        type: 'start_game'
+    }));
+}
+
+function handleServerMessage(data) {
+    switch (data.type) {
+        case 'room_created':
+            multiplayerRoomId = data.roomId;
+            multiplayerPlayerId = data.playerId;
+            showLobby(data.roomState);
+            break;
+            
+        case 'room_joined':
+            multiplayerRoomId = data.roomId;
+            multiplayerPlayerId = data.playerId;
+            showLobby(data.roomState);
+            break;
+            
+        case 'player_joined':
+            showLobby(data.roomState);
+            break;
+            
+        case 'player_left':
+            if (gameState === 'lobby') {
+                showLobby(data.roomState);
+            }
+            break;
+            
+        case 'rooms_list':
+            displayRoomList(data.rooms);
+            break;
+            
+        case 'countdown':
+            showCountdown(data.count);
+            break;
+            
+        case 'game_start':
+            startMultiplayerGameClient(data);
+            break;
+            
+        case 'game_update':
+            updateMultiplayerGame(data);
+            break;
+            
+        case 'game_over':
+            endMultiplayerGame(data);
+            break;
+            
+        case 'error':
+            alert(data.message);
+            break;
+    }
+}
+
+function showLobby(roomState) {
+    gameState = 'lobby';
+    const menuContent = document.getElementById('menuContent');
+    
+    const playersList = roomState.players.map(p => 
+        `<div style="padding: 8px; background: #001100; margin: 5px 0; border-radius: 5px;">
+            ${p.name} ${p.id === multiplayerPlayerId ? '(You)' : ''}
+        </div>`
+    ).join('');
+    
+    menuContent.innerHTML = `
+        <h3 style="color: #00ff00; margin-bottom: 20px;">🎮 Lobby</h3>
+        <p style="color: #ffff00;">Room ID: ${roomState.roomId}</p>
+        <p style="color: #00ff00;">Players: ${roomState.playerCount}/4</p>
+        
+        <div style="margin: 20px 0;">
+            ${playersList}
+        </div>
+        
+        ${roomState.playerCount >= 2 ? 
+            '<button class="btn" onclick="startMultiplayerGame()">🚀 Start Game</button>' : 
+            '<p style="color: #ffff00;">Waiting for players... (need at least 2)</p>'}
+        
+        <div class="buttons" style="margin-top: 30px;">
+            <button class="btn-secondary" onclick="leaveRoom()">← Leave Room</button>
+        </div>
+    `;
+}
+
+function displayRoomList(rooms) {
+    const container = document.getElementById('roomListContainer');
+    
+    if (rooms.length === 0) {
+        container.innerHTML = `
+            <div style="color: #ffff00; margin-top: 20px;">
+                No rooms available. Create one!
+            </div>
+        `;
+        return;
+    }
+    
+    const roomItems = rooms.map(room => `
+        <div class="menu-option" onclick="joinRoom('${room.roomId}')">
+            <h4>Room ${room.roomId.slice(-6)}</h4>
+            <p>Players: ${room.playerCount}/4</p>
+        </div>
+    `).join('');
+    
+    container.innerHTML = `
+        <h4 style="color: #00ff00; margin-top: 20px;">Available Rooms:</h4>
+        ${roomItems}
+    `;
+}
+
+function showCountdown(count) {
+    document.getElementById('menu').classList.add('hidden');
+    document.getElementById('gameScreen').classList.remove('hidden');
+    gameState = 'countdown';
+    
+    ctx.fillStyle = COLORS.background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '72px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(count || 'GO!', canvas.width / 2, canvas.height / 2);
+}
+
+function startMultiplayerGameClient(data) {
+    gameState = 'playing';
+    gameRunning = true;
+    multiplayerPlayers = data.players;
+    food = data.food;
+    
+    // Start render loop
+    gameLoop = setInterval(renderMultiplayerGame, 50);
+}
+
+function updateMultiplayerGame(data) {
+    multiplayerPlayers = data.players;
+    food = data.food;
+}
+
+function renderMultiplayerGame() {
+    // Draw background
+    ctx.fillStyle = COLORS.background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= GRID_WIDTH; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * CELL_SIZE, 0);
+        ctx.lineTo(i * CELL_SIZE, canvas.height);
+        ctx.stroke();
+    }
+    for (let i = 0; i <= GRID_HEIGHT; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, i * CELL_SIZE);
+        ctx.lineTo(canvas.width, i * CELL_SIZE);
+        ctx.stroke();
+    }
+    
+    // Draw food
+    ctx.fillStyle = COLORS.food;
+    ctx.fillRect(food.x * CELL_SIZE, food.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    
+    // Draw snakes
+    const colors = ['#00ff00', '#0099ff', '#ff9900', '#ff00ff'];
+    multiplayerPlayers.forEach((player, index) => {
+        if (!player.alive) return;
+        
+        ctx.fillStyle = colors[index % colors.length];
+        player.snake.forEach(segment => {
+            ctx.fillRect(segment.x * CELL_SIZE, segment.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        });
+    });
+    
+    // Draw scores
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'left';
+    multiplayerPlayers.forEach((player, index) => {
+        const color = colors[index % colors.length];
+        const status = player.alive ? '✓' : '✗';
+        ctx.fillStyle = color;
+        ctx.fillText(`${player.name}: ${player.score} ${status}`, 10, 20 + index * 20);
+    });
+}
+
+function endMultiplayerGame(data) {
+    gameRunning = false;
+    gameState = 'gameOver';
+    clearInterval(gameLoop);
+    
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('gameOver').classList.remove('hidden');
+    
+    const gameOverContent = document.getElementById('gameOverContent');
+    
+    const scoresList = data.scores.map((s, i) => 
+        `<div style="padding: 8px; margin: 5px 0; background: ${i === 0 ? '#003300' : '#001100'}; border-radius: 5px;">
+            ${i + 1}. ${s.name}: ${s.score} ${s.id === data.winner.id ? '🏆' : ''}
+        </div>`
+    ).join('');
+    
+    gameOverContent.innerHTML = `
+        <h2 style="color: #00ff00;">Game Over!</h2>
+        <h3 style="color: #ffff00;">Winner: ${data.winner.name}</h3>
+        <p style="color: #00ff00;">Score: ${data.winner.score}</p>
+        
+        <div style="margin-top: 20px;">
+            <h4 style="color: #00ff00;">Final Scores:</h4>
+            ${scoresList}
+        </div>
+        
+        <div class="buttons" style="margin-top: 30px;">
+            <button class="btn" onclick="leaveRoom()">← Back to Lobby</button>
+            <button class="btn-secondary" onclick="showMenu()">Main Menu</button>
+        </div>
+    `;
+}
+
+// Send player moves to server
+document.addEventListener('keydown', (e) => {
+    if (gameMode === 'multiplayer' && gameRunning && multiplayerPlayerId) {
+        let direction = null;
+        
+        if (e.key === 'ArrowUp' || e.key === 'w') direction = 'up';
+        else if (e.key === 'ArrowDown' || e.key === 's') direction = 'down';
+        else if (e.key === 'ArrowLeft' || e.key === 'a') direction = 'left';
+        else if (e.key === 'ArrowRight' || e.key === 'd') direction = 'right';
+        
+        if (direction && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'player_move',
+                playerId: multiplayerPlayerId,
+                direction: direction
+            }));
+        }
+    }
 });
 
 // Start

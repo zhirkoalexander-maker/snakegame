@@ -1,14 +1,49 @@
 # 🐍 Snake Game - Modern Classic Reimagined
 
-A fully-featured Snake game with multiple game modes, themes, sounds, and AI opponent. Available in both **Python Desktop** and **Web Browser** versions.
+A fully-featured Snake game with multiple game modes, themes, sounds, AI opponent, and **online multiplayer**. Available in both **Python Desktop** and **Web Browser** versions.
 
 [![Play Now](https://img.shields.io/badge/Play-Online-brightgreen?style=for-the-badge)](https://zhirkoalexander-maker.github.io/snakegame/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/zhirkoalexander-maker/snakegame)
 [![Download](https://img.shields.io/badge/Download-Desktop%20Version-purple?style=for-the-badge)](https://raw.githubusercontent.com/zhirkoalexander-maker/snakegame/main/snake_game_desktop.py)
+[![Multiplayer](https://img.shields.io/badge/Online-Multiplayer-red?style=for-the-badge)](https://github.com/zhirkoalexander-maker/snakegame/blob/main/MULTIPLAYER_DEPLOY.md)
 
 ---
 
 ## 🎮 Game Versions
+
+### 🌐 Web Version (HTML5 + JavaScript)
+**Files:** `index.html`, `snake_game_web.js`
+
+Browser-based version with all features including **online multiplayer**:
+- **🌐 Online Multiplayer** - Play with friends over the internet! (2-4 players)
+  - Create or join rooms
+  - Real-time synchronization
+  - Lobby system with ready status
+  - Automatic game start countdown
+- **Responsive Design** - Play on any device
+- **No Installation** - Just open and play
+- **Fullscreen Mode** - Immersive gameplay
+- **Player Indicators** - See who's Player 1, Player 2, or Bot
+- **Snake Textures** - Eyes on head, scale pattern on body
+- **Theme Support** - 5 visual themes
+- **3 Game Modes:**
+  - 🎯 Single Player
+  - 🤖 Player vs Bot
+  - 👥 Player vs Player (Local)
+  - 🌐 **Online Multiplayer** (NEW!)
+- **Smart Bot AI:**
+  - Attack mode - Cuts off player when stronger
+  - Food collection - Seeks apples when safe
+  - Independent speed - Player boost doesn't affect bot
+
+#### 🎯 Play Web Version:
+- **Online:** [https://zhirkoalexander-maker.github.io/snakegame/](https://zhirkoalexander-maker.github.io/snakegame/)
+- **Offline:** Open `index.html` in your browser
+
+#### 🌐 Setting up Multiplayer:
+See [MULTIPLAYER_DEPLOY.md](MULTIPLAYER_DEPLOY.md) for detailed instructions on deploying the multiplayer server.
+
+---
 
 ### 🖥️ Desktop Version (Python + Pygame)
 **File:** `snake_game_desktop.py`
