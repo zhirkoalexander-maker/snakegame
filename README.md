@@ -2,8 +2,9 @@
 
 A fully-featured Snake game with multiple game modes, themes, sounds, and AI opponent. Available in both **Python Desktop** and **Web Browser** versions.
 
-[![Play Now](https://img.shields.io/badge/Play-Online-brightgreen?style=for-the-badge)](https://snakegame-alex.netlify.app/)
+[![Play Now](https://img.shields.io/badge/Play-Online-brightgreen?style=for-the-badge)](https://zhirkoalexander-maker.github.io/snakegame/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/zhirkoalexander-maker/snakegame)
+[![Download](https://img.shields.io/badge/Download-Desktop%20Version-purple?style=for-the-badge)](https://raw.githubusercontent.com/zhirkoalexander-maker/snakegame/main/snake_game_desktop.py)
 
 ---
 

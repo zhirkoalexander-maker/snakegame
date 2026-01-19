@@ -90,6 +90,25 @@
             background: #444;
             transform: scale(1.05);
         }
+        .btn-download {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: 2px solid #fff;
+        }
+        .btn-download:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+        }
+        .version-badge {
+            display: inline-block;
+            background: rgba(0, 255, 0, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin: 0 10px;
+            border: 1px solid #00ff00;
+        }
         #menu, #gameOver {
             background: rgba(0, 0, 0, 0.95);
             padding: 40px;
@@ -244,6 +263,10 @@
     
     <div class="container">
         <h1>🐍 Snake Game 🐍</h1>
+        <div style="text-align: center; margin-bottom: 10px;">
+            <span class="version-badge">🌐 Web Version</span>
+            <span class="version-badge">🖥️ Desktop Available</span>
+        </div>
         
         <!-- Menu -->
         <div id="menu">
@@ -299,10 +322,24 @@
     
     <div class="footer">
         <p>🐍 <strong>Snake Game</strong> - Classic arcade game reimagined</p>
-        <p>🎮 Also available as <strong>Python Desktop Version</strong> with enhanced features!</p>
+        <p style="margin: 20px 0;">
+            <a href="https://raw.githubusercontent.com/zhirkoalexander-maker/snakegame/main/snake_game_desktop.py" 
+               download="snake_game_desktop.py" 
+               class="btn btn-download" 
+               style="padding: 15px 30px; font-size: 1.1em;">
+                🐍 Download Python Desktop Version (Power-Ups Mode!)
+            </a>
+        </p>
+        <p style="font-size: 0.95em; color: #aaa; margin: 15px 0;">
+            <strong>Desktop version features:</strong><br>
+            ⚡ Power-Up Mode: Shield, Ghost, Magnet, Speed & Shrink abilities<br>
+            🎨 5 Beautiful Themes & Custom Controls<br>
+            🤖 Smart AI Bot & Local Leaderboard<br>
+            📦 Requires: Python 3.8+ and pygame
+        </p>
         <p>
-            📦 <a href="https://github.com/zhirkoalexander-maker/snakegame" target="_blank">View on GitHub</a> | 
-            Download Python version for offline play
+            📦 <a href="https://github.com/zhirkoalexander-maker/snakegame" target="_blank">View Source on GitHub</a> | 
+            <a href="https://github.com/zhirkoalexander-maker/snakegame/blob/main/README.md" target="_blank">Installation Guide</a>
         </p>
         <p style="font-size: 0.9em; color: #666;">
             Made with ❤️ using Pygame (Desktop) and HTML5 Canvas (Web)
