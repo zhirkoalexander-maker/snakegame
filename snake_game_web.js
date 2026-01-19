@@ -22,9 +22,8 @@ let countdownInterval = null;
 let highScore = 0;
 
 // Multiplayer
-// ВАЖНО: Замените на ваш URL после деплоя сервера на Glitch!
-// Инструкция: https://github.com/zhirkoalexander-maker/snakegame/blob/main/QUICKSTART_MULTIPLAYER.md
-const SERVER_URL = ''; // Например: 'wss://your-project-name.glitch.me'
+// Сервер на Glitch - простая комната на 2 игроков
+const SERVER_URL = 'wss://jolly-nonstop-mist.glitch.me';
 let ws = null;
 let multiplayerRoomId = null;
 let multiplayerPlayerId = null;
@@ -956,7 +955,7 @@ document.addEventListener('keyup', (e) => {
 function showMultiplayerMenu() {
     const menuContent = document.getElementById('menuContent');
     menuContent.innerHTML = `
-        <h3 style="color: #00ff00; margin-bottom: 20px;">🌐 Online Multiplayer</h3>
+        <h3 style="color: #00ff00; margin-bottom: 20px;">🌐 Online Multiplayer (2 Players)</h3>
         
         <div style="text-align: center; margin-bottom: 20px;">
             <input type="text" id="playerNameInput" placeholder="Enter your name" 
@@ -965,17 +964,11 @@ function showMultiplayerMenu() {
                    maxlength="15" value="${playerName}">
         </div>
         
-        <div class="menu-option" onclick="createRoom()">
-            <h4>🎮 Create Room</h4>
-            <p>Start a new multiplayer game</p>
+        <div class="menu-option" onclick="joinGame()">
+            <h4>🎮 Join Game</h4>
+            <p>Connect and wait for opponent</p>
         </div>
         
-        <div class="menu-option" onclick="showRoomList()">
-            <h4>🔍 Join Room</h4>
-            <p>Browse available rooms</p>
-        </div>
-        
-        <div id="roomListContainer"></div>
         <div id="multiplayerStatus" style="color: #ffff00; margin-top: 20px;"></div>
         
         <div class="buttons" style="margin-top: 30px;">
@@ -1044,12 +1037,12 @@ function connectWebSocket() {
     });
 }
 
-function createRoom() {
+function joinGame() {
     playerName = document.getElementById('playerNameInput').value.trim() || 'Player';
     
     connectWebSocket().then(() => {
         ws.send(JSON.stringify({
-            type: 'create_room',
+            type: 'join',
             playerName: playerName
         }));
     }).catch(err => {
@@ -1057,41 +1050,16 @@ function createRoom() {
     });
 }
 
-function showRoomList() {
-    playerName = document.getElementById('playerNameInput').value.trim() || 'Player';
-    
-    connectWebSocket().then(() => {
-        ws.send(JSON.stringify({
-            type: 'list_rooms'
-        }));
-    }).catch(err => {
-        // Ошибка уже отображена в connectWebSocket
-    });
-}
-
-function joinRoom(roomId) {
-    ws.send(JSON.stringify({
-        type: 'join_room',
-        roomId: roomId,
-        playerName: playerName
-    }));
-}
-
-function leaveRoom() {
-    if (ws && multiplayerRoomId) {
-        ws.send(JSON.stringify({
-            type: 'leave_room'
-        }));
+function leaveGame() {
+    if (ws) {
+        ws.close();
     }
-    multiplayerRoomId = null;
     multiplayerPlayerId = null;
     multiplayerPlayers = [];
     showMultiplayerMenu();
 }
 
 function startMultiplayerGame() {
-    if (!multiplayerRoomId) return;
-    
     ws.send(JSON.stringify({
         type: 'start_game'
     }));
@@ -1099,30 +1067,25 @@ function startMultiplayerGame() {
 
 function handleServerMessage(data) {
     switch (data.type) {
-        case 'room_created':
-            multiplayerRoomId = data.roomId;
-            multiplayerPlayerId = data.playerId;
-            showLobby(data.roomState);
-            break;
-            
-        case 'room_joined':
-            multiplayerRoomId = data.roomId;
+        case 'joined':
             multiplayerPlayerId = data.playerId;
             showLobby(data.roomState);
             break;
             
         case 'player_joined':
-            showLobby(data.roomState);
-            break;
-            
-        case 'player_left':
             if (gameState === 'lobby') {
                 showLobby(data.roomState);
             }
             break;
             
-        case 'rooms_list':
-            displayRoomList(data.rooms);
+        case 'player_left':
+            if (gameState === 'lobby') {
+                showLobby(data.roomState);
+            } else if (gameState === 'playing') {
+                endGame();
+                alert('Opponent left the game');
+                showMultiplayerMenu();
+            }
             break;
             
         case 'countdown':
@@ -1158,9 +1121,8 @@ function showLobby(roomState) {
     ).join('');
     
     menuContent.innerHTML = `
-        <h3 style="color: #00ff00; margin-bottom: 20px;">🎮 Lobby</h3>
-        <p style="color: #ffff00;">Room ID: ${roomState.roomId}</p>
-        <p style="color: #00ff00;">Players: ${roomState.playerCount}/4</p>
+        <h3 style="color: #00ff00; margin-bottom: 20px;">🎮 Waiting for Players</h3>
+        <p style="color: #00ff00;">Players: ${roomState.playerCount}/2</p>
         
         <div style="margin: 20px 0;">
             ${playersList}
@@ -1168,36 +1130,11 @@ function showLobby(roomState) {
         
         ${roomState.playerCount >= 2 ? 
             '<button class="btn" onclick="startMultiplayerGame()">🚀 Start Game</button>' : 
-            '<p style="color: #ffff00;">Waiting for players... (need at least 2)</p>'}
+            '<p style="color: #ffff00;">Waiting for opponent...</p>'}
         
         <div class="buttons" style="margin-top: 30px;">
-            <button class="btn-secondary" onclick="leaveRoom()">← Leave Room</button>
+            <button class="btn-secondary" onclick="leaveGame()">← Leave</button>
         </div>
-    `;
-}
-
-function displayRoomList(rooms) {
-    const container = document.getElementById('roomListContainer');
-    
-    if (rooms.length === 0) {
-        container.innerHTML = `
-            <div style="color: #ffff00; margin-top: 20px;">
-                No rooms available. Create one!
-            </div>
-        `;
-        return;
-    }
-    
-    const roomItems = rooms.map(room => `
-        <div class="menu-option" onclick="joinRoom('${room.roomId}')">
-            <h4>Room ${room.roomId.slice(-6)}</h4>
-            <p>Players: ${room.playerCount}/4</p>
-        </div>
-    `).join('');
-    
-    container.innerHTML = `
-        <h4 style="color: #00ff00; margin-top: 20px;">Available Rooms:</h4>
-        ${roomItems}
     `;
 }
 
@@ -1305,7 +1242,7 @@ function endMultiplayerGame(data) {
         </div>
         
         <div class="buttons" style="margin-top: 30px;">
-            <button class="btn" onclick="leaveRoom()">← Back to Lobby</button>
+            <button class="btn" onclick="leaveGame()">← Back</button>
             <button class="btn-secondary" onclick="showMenu()">Main Menu</button>
         </div>
     `;
