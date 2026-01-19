@@ -369,7 +369,7 @@ class Menu:
         # Обновляем фоновую игру
         current_time = pygame.time.get_ticks()
         if current_time - self.bg_last_move > 100:
-            self.background_game.move()
+            self.background_game.move(current_time)  # Передаем current_time для бота
             self.bg_last_move = current_time
         
         # Рисуем только змей и еду без UI (без score)
