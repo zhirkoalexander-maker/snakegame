@@ -62,6 +62,21 @@ class Snake:
         if self.invincible:
             return  # Не умираем от столкновений
         
+        # Бот не может самоубиться - только игрок может его убить
+        if self.is_bot:
+            # Бот умирает только от столкновения с игроком
+            for snake in snakes:
+                if snake is not self and not snake.is_bot:  # Проверяем столкновение только с игроком
+                    if head == snake.get_head():
+                        self.alive = False
+                        return
+                    elif head in snake.body[1:]:
+                        self.alive = False
+                        return
+            # Бот НЕ умирает от стен, границ и себя - просто выходим
+            return
+        
+        # Для игрока (не бота) - обычные правила
         # Серые стены убивают только если walls_enabled=True и нет ghost_mode
         if walls_enabled and head_grid in walls and not self.ghost_mode:
             self.alive = False
@@ -330,6 +345,7 @@ class Menu:
             # Создаём новую фоновую игру с одним ботом
             bg_game = SnakeGame(100, GREEN, mode='single', walls_type='No walls', theme='classic', settings=self.settings)
             bg_game.screen = self.screen
+            bg_game.game_active = True  # Активируем игру сразу
             # Делаем змею ботом
             bg_game.snakes[0].is_bot = True
             bg_game.snakes[0].controls = {}
@@ -1210,36 +1226,28 @@ class SnakeGame:
         snake = self.snakes[0]  # Игрок всегда первая змея в power-up режиме
         current_time = pygame.time.get_ticks()
         
-        print(f"Applying powerup: {powerup_type}")  # Отладка
-        
         if powerup_type == 'shield':
             # Неуязвимость на 10 секунд
             snake.invincible = True
             snake.active_powerups.append({'type': 'shield', 'end_time': current_time + 10000})
-            print(f"Shield activated! invincible={snake.invincible}")
         elif powerup_type == 'ghost':
             # Проход сквозь стены на 8 секунд
             snake.ghost_mode = True
             snake.active_powerups.append({'type': 'ghost', 'end_time': current_time + 8000})
-            print(f"Ghost activated! ghost_mode={snake.ghost_mode}")
         elif powerup_type == 'magnet':
             # Магнит притягивает яблоки на 12 секунд
             snake.magnet_range = 150  # радиус притяжения в пикселях
             snake.active_powerups.append({'type': 'magnet', 'end_time': current_time + 12000})
-            print(f"Magnet activated! magnet_range={snake.magnet_range}")
         elif powerup_type == 'speed':
             # Ускорение на 7 секунд
-            original_delay = self.move_delay
             self.move_delay = max(10, self.move_delay // 2)
-            snake.active_powerups.append({'type': 'speed', 'end_time': current_time + 7000, 'original_delay': original_delay})
-            print(f"Speed activated! delay={self.move_delay}")
+            snake.active_powerups.append({'type': 'speed', 'end_time': current_time + 7000, 'original_delay': self.move_delay * 2})
         elif powerup_type == 'shrink':
             # Уменьшить змею на 3 сегмента (минимум 1)
             segments_to_remove = min(3, len(snake.body) - 1)
             for _ in range(segments_to_remove):
                 if len(snake.body) > 1:
                     snake.body.pop()
-            print(f"Shrink activated! removed {segments_to_remove} segments, new length={len(snake.body)}")
 
     def handle_events(self):
         for event in pygame.event.get():
