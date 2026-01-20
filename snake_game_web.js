@@ -231,6 +231,10 @@ function renderMenu() {
                 <h4>👥 Player vs Player</h4>
                 <p>Compete with a friend!</p>
             </div>
+            <div class="menu-option" onclick="selectMode('multiplayer')">
+                <h4>🌐 Online Multiplayer</h4>
+                <p>Play with others online!</p>
+            </div>
             <div class="buttons" style="margin-top: 20px;">
                 <button class="btn-secondary" onclick="showLeaderboard()">🏆 Leaderboard</button>
                 <button class="btn-secondary" onclick="menuStep='settings'; renderMenu()">⚙️ Settings</button>
