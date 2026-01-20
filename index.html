@@ -100,6 +100,22 @@
             transform: scale(1.05);
             box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
         }
+        .btn-warning {
+            background: #ffa500;
+            color: #000;
+        }
+        .btn-warning:hover {
+            background: #ff8c00;
+            transform: scale(1.05);
+        }
+        .btn-success {
+            background: #00cc00;
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #00aa00;
+            transform: scale(1.05);
+        }
         .version-badge {
             display: inline-block;
             background: rgba(0, 255, 0, 0.2);
@@ -302,6 +318,7 @@
             </div>
             
             <div class="buttons">
+                <button id="pauseBtn" class="btn-warning" onclick="togglePause()">⏸️ Pause</button>
                 <button class="btn-primary" onclick="restartGame()">🔄 Restart</button>
                 <button class="btn-secondary" onclick="backToMenu()">← Menu</button>
             </div>

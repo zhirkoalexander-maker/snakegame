@@ -10,6 +10,7 @@ let gameState = 'menu';
 let gameMode = 'single';
 let snakeColor = '#00ff00';
 let gameRunning = false;
+let isPaused = false;
 let speed = 150;
 let normalSpeed = 150;
 let fastSpeed = 75;
@@ -184,7 +185,31 @@ function updateScores() {
 }
 
 function restartGame() {
+    isPaused = false;
+    const pauseBtn = document.getElementById('pauseBtn');
+    if (pauseBtn) {
+        pauseBtn.textContent = '⏸️ Pause';
+        pauseBtn.classList.remove('btn-success');
+        pauseBtn.classList.add('btn-warning');
+    }
     startGame();
+}
+
+function togglePause() {
+    if (!gameRunning || countdown > 0) return;
+    
+    isPaused = !isPaused;
+    const pauseBtn = document.getElementById('pauseBtn');
+    
+    if (isPaused) {
+        pauseBtn.textContent = '▶️ Resume';
+        pauseBtn.classList.remove('btn-warning');
+        pauseBtn.classList.add('btn-success');
+    } else {
+        pauseBtn.textContent = '⏸️ Pause';
+        pauseBtn.classList.remove('btn-success');
+        pauseBtn.classList.add('btn-warning');
+    }
 }
 
 function renderMenu() {
@@ -603,7 +628,7 @@ function botMove(bot) {
 }
 
 function update() {
-    if (!gameRunning) return;
+    if (!gameRunning || isPaused) return;
     
     let alivePlayers = players.filter(p => p.alive);
     
@@ -930,6 +955,7 @@ function gameOver() {
 function backToMenu() {
     // Stop game and clear all intervals
     gameRunning = false;
+    isPaused = false;
     if (gameLoop) {
         clearInterval(gameLoop);
         gameLoop = null;
