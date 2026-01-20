@@ -84,10 +84,18 @@ function startGame() {
   
   gameRoom.players.forEach((player, index) => {
     const pos = startPositions[index];
-    player.snake = [pos];
+    // Create snake with 3 segments based on initial direction
+    const dir = index === 0 ? 'right' : 'left';
+    const dx = dir === 'right' ? -1 : 1;
+    
+    player.snake = [
+      pos,
+      { x: pos.x + dx, y: pos.y },
+      { x: pos.x + dx * 2, y: pos.y }
+    ];
     player.alive = true;
     player.score = 0;
-    player.direction = index === 0 ? 'right' : 'left';
+    player.direction = dir;
   });
   
   broadcast({
