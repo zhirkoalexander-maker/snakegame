@@ -10,6 +10,7 @@ let gameState = 'menu';
 let gameMode = 'single';
 let snakeColor = '#00ff00';
 let gameRunning = false;
+let isPaused = false;
 let speed = 150;
 let normalSpeed = 150;
 let fastSpeed = 75;
@@ -20,6 +21,15 @@ let currentTheme = 'dark';
 let countdown = 0;
 let countdownInterval = null;
 let highScore = 0;
+
+// Multiplayer
+// Сервер на Render.com - простая комната на 2 игроков
+const SERVER_URL = 'wss://snakegame-h63c.onrender.com';
+let ws = null;
+let multiplayerRoomId = null;
+let multiplayerPlayerId = null;
+let multiplayerPlayers = [];
+let playerName = '';
 
 // Menu
 let menuStep = 'mode';
@@ -175,7 +185,31 @@ function updateScores() {
 }
 
 function restartGame() {
+    isPaused = false;
+    const pauseBtn = document.getElementById('pauseBtn');
+    if (pauseBtn) {
+        pauseBtn.textContent = '⏸️ Pause';
+        pauseBtn.classList.remove('btn-success');
+        pauseBtn.classList.add('btn-warning');
+    }
     startGame();
+}
+
+function togglePause() {
+    if (!gameRunning || countdown > 0) return;
+    
+    isPaused = !isPaused;
+    const pauseBtn = document.getElementById('pauseBtn');
+    
+    if (isPaused) {
+        pauseBtn.textContent = '▶️ Resume';
+        pauseBtn.classList.remove('btn-warning');
+        pauseBtn.classList.add('btn-success');
+    } else {
+        pauseBtn.textContent = '⏸️ Pause';
+        pauseBtn.classList.remove('btn-success');
+        pauseBtn.classList.add('btn-warning');
+    }
 }
 
 function renderMenu() {
@@ -195,6 +229,10 @@ function renderMenu() {
             <div class="menu-option" onclick="selectMode('pvp')">
                 <h4>👥 Player vs Player</h4>
                 <p>Compete with a friend!</p>
+            </div>
+            <div class="menu-option" onclick="selectMode('multiplayer')">
+                <h4>🌐 Online Multiplayer</h4>
+                <p>Play with others online!</p>
             </div>
             <div class="buttons" style="margin-top: 20px;">
                 <button class="btn-secondary" onclick="showLeaderboard()">🏆 Leaderboard</button>
@@ -331,8 +369,12 @@ function selectTheme(theme) {
 
 function selectMode(mode) {
     gameMode = mode;
-    menuStep = 'color';
-    renderMenu();
+    if (mode === 'multiplayer') {
+        showMultiplayerMenu();
+    } else {
+        menuStep = 'color';
+        renderMenu();
+    }
 }
 
 function selectColor(color) {
@@ -347,10 +389,15 @@ function startGame() {
     document.getElementById('gameScreen').classList.remove('hidden');
     document.getElementById('gameOver').classList.add('hidden');
     
+    // Adjust starting positions based on walls
+    const offset = wallsMode === 'with_walls' ? 3 : 0;
+    const centerX = Math.floor(GRID_WIDTH / 2);
+    const centerY = Math.floor(GRID_HEIGHT / 2);
+    
     // Setup players
     players = [];
     if (gameMode === 'single') {
-        players.push(createSnake(15, 15, 1, 0, snakeColor, {
+        players.push(createSnake(centerX, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
@@ -360,25 +407,25 @@ function startGame() {
         document.getElementById('score2Display').classList.add('hidden');
         document.getElementById('finalScore2Display').classList.add('hidden');
     } else if (gameMode === 'bot') {
-        players.push(createSnake(10, 15, 1, 0, snakeColor, {
+        players.push(createSnake(5 + offset, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
             right: 'ArrowRight',
             speed: ' '
         }, false));
-        players.push(createSnake(20, 15, -1, 0, COLORS.bot, {}, true));
+        players.push(createSnake(GRID_WIDTH - 5 - offset, centerY, -1, 0, COLORS.bot, {}, true));
         document.getElementById('score2Display').classList.remove('hidden');
         document.getElementById('finalScore2Display').classList.remove('hidden');
     } else if (gameMode === 'pvp') {
-        players.push(createSnake(10, 15, 1, 0, snakeColor, {
+        players.push(createSnake(5 + offset, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
             right: 'ArrowRight',
             speed: 'Shift'
         }, false));
-        players.push(createSnake(20, 15, -1, 0, COLORS.player2, {
+        players.push(createSnake(GRID_WIDTH - 5 - offset, centerY, -1, 0, COLORS.player2, {
             up: 'w',
             down: 's',
             left: 'a',
@@ -448,10 +495,18 @@ function spawnFood() {
     }
     
     do {
-        food = {
-            x: Math.floor(Math.random() * GRID_WIDTH),
-            y: Math.floor(Math.random() * GRID_HEIGHT)
-        };
+        if (wallsMode === 'with_walls') {
+            // Spawn food away from walls
+            food = {
+                x: Math.floor(Math.random() * (GRID_WIDTH - 2)) + 1,
+                y: Math.floor(Math.random() * (GRID_HEIGHT - 2)) + 1
+            };
+        } else {
+            food = {
+                x: Math.floor(Math.random() * GRID_WIDTH),
+                y: Math.floor(Math.random() * GRID_HEIGHT)
+            };
+        }
     } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y));
 }
 
@@ -573,7 +628,7 @@ function botMove(bot) {
 }
 
 function update() {
-    if (!gameRunning) return;
+    if (!gameRunning || isPaused) return;
     
     let alivePlayers = players.filter(p => p.alive);
     
@@ -729,9 +784,27 @@ function draw() {
     
     // Draw walls if enabled
     if (wallsMode === 'with_walls') {
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+        ctx.fillStyle = '#333333';
+        
+        // Top wall
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            ctx.fillRect(x * CELL_SIZE, 0, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+        
+        // Bottom wall
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            ctx.fillRect(x * CELL_SIZE, (GRID_HEIGHT - 1) * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+        
+        // Left wall
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            ctx.fillRect(0, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+        
+        // Right wall
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            ctx.fillRect((GRID_WIDTH - 1) * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
     }
     
     // Draw players with textures
@@ -880,6 +953,19 @@ function gameOver() {
 }
 
 function backToMenu() {
+    // Stop game and clear all intervals
+    gameRunning = false;
+    isPaused = false;
+    if (gameLoop) {
+        clearInterval(gameLoop);
+        gameLoop = null;
+    }
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    countdown = 0;
+    
     menuStep = 'mode';
     gameState = 'menu';
     document.getElementById('menu').classList.remove('hidden');
@@ -931,6 +1017,324 @@ document.addEventListener('keyup', (e) => {
     });
     
     e.preventDefault();
+});
+
+// ============= MULTIPLAYER FUNCTIONS =============
+
+function showMultiplayerMenu() {
+    const menuContent = document.getElementById('menuContent');
+    menuContent.innerHTML = `
+        <h3 style="color: #00ff00; margin-bottom: 20px;">🌐 Online Multiplayer (2 Players)</h3>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <input type="text" id="playerNameInput" placeholder="Enter your name" 
+                   style="padding: 10px; font-size: 16px; border: 2px solid #00ff00; 
+                          background: #000; color: #00ff00; border-radius: 5px; width: 250px;"
+                   maxlength="15" value="${playerName}">
+        </div>
+        
+        <div class="menu-option" onclick="joinGame()">
+            <h4>🎮 Join Game</h4>
+            <p>Connect and wait for opponent</p>
+        </div>
+        
+        <div id="multiplayerStatus" style="color: #ffff00; margin-top: 20px;"></div>
+        
+        <div class="buttons" style="margin-top: 30px;">
+            <button class="btn-secondary" onclick="menuStep='mode'; renderMenu()">← Back</button>
+        </div>
+    `;
+}
+
+function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) return Promise.resolve();
+    
+    // Проверка, что URL сервера установлен
+    if (!SERVER_URL || SERVER_URL === '') {
+        document.getElementById('multiplayerStatus').innerHTML = `
+            <div style="color: #ff9900; text-align: left; max-width: 500px; margin: 20px auto; padding: 15px; background: #221100; border: 2px solid #ff9900; border-radius: 5px;">
+                <h4 style="color: #ff9900; margin: 0 0 10px 0;">⚠️ Сервер не настроен</h4>
+                <p style="margin: 5px 0; font-size: 14px;">Для игры в онлайн мультиплеер нужно:</p>
+                <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                    <li>Задеплоить сервер на Glitch (5 минут)</li>
+                    <li>Обновить SERVER_URL в коде</li>
+                    <li>Запушить изменения</li>
+                </ol>
+                <p style="margin: 10px 0 0 0; font-size: 14px;">
+                    📖 <a href="https://github.com/zhirkoalexander-maker/snakegame/blob/main/QUICKSTART_MULTIPLAYER.md" 
+                         target="_blank" style="color: #00ff00; text-decoration: underline;">
+                         Инструкция по настройке
+                    </a>
+                </p>
+            </div>
+        `;
+        return Promise.reject(new Error('Server URL not configured'));
+    }
+    
+    return new Promise((resolve, reject) => {
+        document.getElementById('multiplayerStatus').textContent = '🔄 Connecting to server...';
+        document.getElementById('multiplayerStatus').style.color = '#ffff00';
+        
+        ws = new WebSocket(SERVER_URL);
+        
+        ws.onopen = () => {
+            document.getElementById('multiplayerStatus').textContent = '✅ Connected to server';
+            document.getElementById('multiplayerStatus').style.color = '#00ff00';
+            resolve();
+        };
+        
+        ws.onerror = () => {
+            document.getElementById('multiplayerStatus').innerHTML = `
+                <div style="color: #ff0000;">
+                    ❌ Не удалось подключиться к серверу
+                    <br><small>Проверьте, что сервер запущен на Glitch</small>
+                </div>
+            `;
+            reject(new Error('WebSocket connection failed'));
+        };
+        
+        ws.onclose = () => {
+            if (gameMode === 'multiplayer' && gameState === 'playing') {
+                endGame();
+                alert('Lost connection to server');
+            }
+        };
+        
+        ws.onmessage = (event) => {
+            handleServerMessage(JSON.parse(event.data));
+        };
+    });
+}
+
+function joinGame() {
+    playerName = document.getElementById('playerNameInput').value.trim() || 'Player';
+    
+    connectWebSocket().then(() => {
+        ws.send(JSON.stringify({
+            type: 'join',
+            playerName: playerName
+        }));
+    }).catch(err => {
+        // Ошибка уже отображена в connectWebSocket
+    });
+}
+
+function leaveGame() {
+    if (ws) {
+        ws.close();
+    }
+    multiplayerPlayerId = null;
+    multiplayerPlayers = [];
+    showMultiplayerMenu();
+}
+
+function startMultiplayerGame() {
+    ws.send(JSON.stringify({
+        type: 'start_game'
+    }));
+}
+
+function handleServerMessage(data) {
+    switch (data.type) {
+        case 'joined':
+            multiplayerPlayerId = data.playerId;
+            showLobby(data.roomState);
+            break;
+            
+        case 'player_joined':
+            if (gameState === 'lobby') {
+                showLobby(data.roomState);
+            }
+            break;
+            
+        case 'player_left':
+            if (gameState === 'lobby') {
+                showLobby(data.roomState);
+            } else if (gameState === 'playing') {
+                endGame();
+                alert('Opponent left the game');
+                showMultiplayerMenu();
+            }
+            break;
+            
+        case 'countdown':
+            showCountdown(data.count);
+            break;
+            
+        case 'game_start':
+            startMultiplayerGameClient(data);
+            break;
+            
+        case 'game_update':
+            updateMultiplayerGame(data);
+            break;
+            
+        case 'game_over':
+            endMultiplayerGame(data);
+            break;
+            
+        case 'error':
+            alert(data.message);
+            break;
+    }
+}
+
+function showLobby(roomState) {
+    gameState = 'lobby';
+    const menuContent = document.getElementById('menuContent');
+    
+    const playersList = roomState.players.map(p => 
+        `<div style="padding: 8px; background: #001100; margin: 5px 0; border-radius: 5px;">
+            ${p.name} ${p.id === multiplayerPlayerId ? '(You)' : ''}
+        </div>`
+    ).join('');
+    
+    menuContent.innerHTML = `
+        <h3 style="color: #00ff00; margin-bottom: 20px;">🎮 Waiting for Players</h3>
+        <p style="color: #00ff00;">Players: ${roomState.playerCount}/2</p>
+        
+        <div style="margin: 20px 0;">
+            ${playersList}
+        </div>
+        
+        ${roomState.playerCount >= 2 ? 
+            '<button class="btn" onclick="startMultiplayerGame()">🚀 Start Game</button>' : 
+            '<p style="color: #ffff00;">Waiting for opponent...</p>'}
+        
+        <div class="buttons" style="margin-top: 30px;">
+            <button class="btn-secondary" onclick="leaveGame()">← Leave</button>
+        </div>
+    `;
+}
+
+function showCountdown(count) {
+    document.getElementById('menu').classList.add('hidden');
+    document.getElementById('gameScreen').classList.remove('hidden');
+    gameState = 'countdown';
+    
+    ctx.fillStyle = COLORS.background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '72px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(count || 'GO!', canvas.width / 2, canvas.height / 2);
+}
+
+function startMultiplayerGameClient(data) {
+    gameState = 'playing';
+    gameRunning = true;
+    multiplayerPlayers = data.players;
+    food = data.food;
+    
+    // Start render loop
+    gameLoop = setInterval(renderMultiplayerGame, 50);
+}
+
+function updateMultiplayerGame(data) {
+    multiplayerPlayers = data.players;
+    food = data.food;
+}
+
+function renderMultiplayerGame() {
+    // Draw background
+    ctx.fillStyle = COLORS.background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= GRID_WIDTH; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * CELL_SIZE, 0);
+        ctx.lineTo(i * CELL_SIZE, canvas.height);
+        ctx.stroke();
+    }
+    for (let i = 0; i <= GRID_HEIGHT; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, i * CELL_SIZE);
+        ctx.lineTo(canvas.width, i * CELL_SIZE);
+        ctx.stroke();
+    }
+    
+    // Draw food
+    ctx.fillStyle = COLORS.food;
+    ctx.fillRect(food.x * CELL_SIZE, food.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    
+    // Draw snakes
+    const colors = ['#00ff00', '#0099ff', '#ff9900', '#ff00ff'];
+    multiplayerPlayers.forEach((player, index) => {
+        if (!player.alive) return;
+        
+        ctx.fillStyle = colors[index % colors.length];
+        player.snake.forEach(segment => {
+            ctx.fillRect(segment.x * CELL_SIZE, segment.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        });
+    });
+    
+    // Draw scores
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'left';
+    multiplayerPlayers.forEach((player, index) => {
+        const color = colors[index % colors.length];
+        const status = player.alive ? '✓' : '✗';
+        ctx.fillStyle = color;
+        ctx.fillText(`${player.name}: ${player.score} ${status}`, 10, 20 + index * 20);
+    });
+}
+
+function endMultiplayerGame(data) {
+    gameRunning = false;
+    gameState = 'gameOver';
+    clearInterval(gameLoop);
+    
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('gameOver').classList.remove('hidden');
+    
+    const gameOverContent = document.getElementById('gameOverContent');
+    
+    const scoresList = data.scores.map((s, i) => 
+        `<div style="padding: 8px; margin: 5px 0; background: ${i === 0 ? '#003300' : '#001100'}; border-radius: 5px;">
+            ${i + 1}. ${s.name}: ${s.score} ${s.id === data.winner.id ? '🏆' : ''}
+        </div>`
+    ).join('');
+    
+    gameOverContent.innerHTML = `
+        <h2 style="color: #00ff00;">Game Over!</h2>
+        <h3 style="color: #ffff00;">Winner: ${data.winner.name}</h3>
+        <p style="color: #00ff00;">Score: ${data.winner.score}</p>
+        
+        <div style="margin-top: 20px;">
+            <h4 style="color: #00ff00;">Final Scores:</h4>
+            ${scoresList}
+        </div>
+        
+        <div class="buttons" style="margin-top: 30px;">
+            <button class="btn" onclick="leaveGame()">← Back</button>
+            <button class="btn-secondary" onclick="showMenu()">Main Menu</button>
+        </div>
+    `;
+}
+
+// Send player moves to server
+document.addEventListener('keydown', (e) => {
+    if (gameMode === 'multiplayer' && gameRunning && multiplayerPlayerId) {
+        let direction = null;
+        
+        if (e.key === 'ArrowUp' || e.key === 'w') direction = 'up';
+        else if (e.key === 'ArrowDown' || e.key === 's') direction = 'down';
+        else if (e.key === 'ArrowLeft' || e.key === 'a') direction = 'left';
+        else if (e.key === 'ArrowRight' || e.key === 'd') direction = 'right';
+        
+        if (direction && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'player_move',
+                playerId: multiplayerPlayerId,
+                direction: direction
+            }));
+        }
+    }
 });
 
 // Start
