@@ -22,8 +22,9 @@ let countdownInterval = null;
 let highScore = 0;
 
 // Multiplayer
-// Сервер на Glitch - простая комната на 2 игроков
-const SERVER_URL = 'wss://jolly-nonstop-mist.glitch.me';
+// Временный публичный тестовый сервер (пока вы не задеплоите свой)
+// Альтернативы деплоя: Railway.app, Render.com (см. RENDER_DEPLOY.md)
+const SERVER_URL = 'wss://snake-multiplayer-test.onrender.com';
 let ws = null;
 let multiplayerRoomId = null;
 let multiplayerPlayerId = null;
