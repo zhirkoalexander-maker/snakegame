@@ -364,10 +364,15 @@ function startGame() {
     document.getElementById('gameScreen').classList.remove('hidden');
     document.getElementById('gameOver').classList.add('hidden');
     
+    // Adjust starting positions based on walls
+    const offset = wallsMode === 'with_walls' ? 3 : 0;
+    const centerX = Math.floor(GRID_WIDTH / 2);
+    const centerY = Math.floor(GRID_HEIGHT / 2);
+    
     // Setup players
     players = [];
     if (gameMode === 'single') {
-        players.push(createSnake(15, 15, 1, 0, snakeColor, {
+        players.push(createSnake(centerX, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
@@ -377,25 +382,25 @@ function startGame() {
         document.getElementById('score2Display').classList.add('hidden');
         document.getElementById('finalScore2Display').classList.add('hidden');
     } else if (gameMode === 'bot') {
-        players.push(createSnake(10, 15, 1, 0, snakeColor, {
+        players.push(createSnake(5 + offset, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
             right: 'ArrowRight',
             speed: ' '
         }, false));
-        players.push(createSnake(20, 15, -1, 0, COLORS.bot, {}, true));
+        players.push(createSnake(GRID_WIDTH - 5 - offset, centerY, -1, 0, COLORS.bot, {}, true));
         document.getElementById('score2Display').classList.remove('hidden');
         document.getElementById('finalScore2Display').classList.remove('hidden');
     } else if (gameMode === 'pvp') {
-        players.push(createSnake(10, 15, 1, 0, snakeColor, {
+        players.push(createSnake(5 + offset, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
             right: 'ArrowRight',
             speed: 'Shift'
         }, false));
-        players.push(createSnake(20, 15, -1, 0, COLORS.player2, {
+        players.push(createSnake(GRID_WIDTH - 5 - offset, centerY, -1, 0, COLORS.player2, {
             up: 'w',
             down: 's',
             left: 'a',
@@ -465,10 +470,18 @@ function spawnFood() {
     }
     
     do {
-        food = {
-            x: Math.floor(Math.random() * GRID_WIDTH),
-            y: Math.floor(Math.random() * GRID_HEIGHT)
-        };
+        if (wallsMode === 'with_walls') {
+            // Spawn food away from walls
+            food = {
+                x: Math.floor(Math.random() * (GRID_WIDTH - 2)) + 1,
+                y: Math.floor(Math.random() * (GRID_HEIGHT - 2)) + 1
+            };
+        } else {
+            food = {
+                x: Math.floor(Math.random() * GRID_WIDTH),
+                y: Math.floor(Math.random() * GRID_HEIGHT)
+            };
+        }
     } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y));
 }
 
@@ -746,9 +759,27 @@ function draw() {
     
     // Draw walls if enabled
     if (wallsMode === 'with_walls') {
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+        ctx.fillStyle = '#333333';
+        
+        // Top wall
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            ctx.fillRect(x * CELL_SIZE, 0, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+        
+        // Bottom wall
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            ctx.fillRect(x * CELL_SIZE, (GRID_HEIGHT - 1) * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+        
+        // Left wall
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            ctx.fillRect(0, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+        
+        // Right wall
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            ctx.fillRect((GRID_WIDTH - 1) * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
     }
     
     // Draw players with textures
