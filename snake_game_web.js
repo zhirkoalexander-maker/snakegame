@@ -22,9 +22,8 @@ let countdownInterval = null;
 let highScore = 0;
 
 // Multiplayer
-// Временный публичный тестовый сервер (пока вы не задеплоите свой)
-// Альтернативы деплоя: Railway.app, Render.com (см. RENDER_DEPLOY.md)
-const SERVER_URL = 'wss://snake-multiplayer-test.onrender.com';
+// Сервер на Render.com - простая комната на 2 игроков
+const SERVER_URL = 'wss://snakegame-h63c.onrender.com';
 let ws = null;
 let multiplayerRoomId = null;
 let multiplayerPlayerId = null;
