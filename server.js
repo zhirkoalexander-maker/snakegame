@@ -162,13 +162,23 @@ function generateFood(room) {
   return food;
 }
 
-function handleMove(room, playerId, direction) {
+function handleMove(room, playerId, directionStr) {
   if (!room.isPlaying) return;
   
   const player = room.players.find(p => p.id === playerId);
   if (!player || !player.alive) return;
   
-  // Validate direction change
+  // Convert string direction to vector
+  let direction;
+  switch(directionStr) {
+    case 'up': direction = { x: 0, y: -1 }; break;
+    case 'down': direction = { x: 0, y: 1 }; break;
+    case 'left': direction = { x: -1, y: 0 }; break;
+    case 'right': direction = { x: 1, y: 0 }; break;
+    default: return;
+  }
+  
+  // Validate direction change (can't reverse)
   const currentDir = player.snake.direction;
   if ((direction.x !== 0 && currentDir.x !== 0) || (direction.y !== 0 && currentDir.y !== 0)) {
     return; // Can't reverse direction
