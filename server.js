@@ -42,10 +42,7 @@ function removePlayer(ws) {
     gameRoom.players.splice(index, 1);
   }
   
-  // Stop game if playing and someone left
-  if (gameRoom.isPlaying && gameRoom.players.length < 2) {
-    endGame();
-  }
+  // Don't stop game - let remaining player continue or wait for new player
 }
 
 function broadcast(message, excludeWs = null) {
