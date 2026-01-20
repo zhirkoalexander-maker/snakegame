@@ -23,8 +23,8 @@ let countdownInterval = null;
 let highScore = 0;
 
 // Multiplayer
-// Сервер на Render.com - простая комната на 2 игроков
-const SERVER_URL = 'wss://snakegame-h63c.onrender.com';
+// Сервер на Render.com - система комнат на 2 игрока
+const SERVER_URL = 'wss://snakegame-server-new.onrender.com';
 let ws = null;
 let multiplayerRoomId = null;
 let multiplayerPlayerId = null;
