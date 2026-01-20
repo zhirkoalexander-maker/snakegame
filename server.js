@@ -158,11 +158,11 @@ function updateGame() {
       case 'right': head.x++; break;
     }
     
-    // Check wall collision
-    if (head.x < 0 || head.x >= gridSize || head.y < 0 || head.y >= gridSize) {
-      player.alive = false;
-      return;
-    }
+    // Wrap around edges (teleport to opposite side)
+    if (head.x < 0) head.x = gridSize - 1;
+    if (head.x >= gridSize) head.x = 0;
+    if (head.y < 0) head.y = gridSize - 1;
+    if (head.y >= gridSize) head.y = 0;
     
     // Check self collision
     if (player.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
