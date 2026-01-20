@@ -390,8 +390,6 @@ function startGame() {
     document.getElementById('gameScreen').classList.remove('hidden');
     document.getElementById('gameOver').classList.add('hidden');
     
-    // Adjust starting positions based on walls
-    const offset = wallsMode === 'with_walls' ? 3 : 0;
     const centerX = Math.floor(GRID_WIDTH / 2);
     const centerY = Math.floor(GRID_HEIGHT / 2);
     
@@ -408,25 +406,25 @@ function startGame() {
         document.getElementById('score2Display').classList.add('hidden');
         document.getElementById('finalScore2Display').classList.add('hidden');
     } else if (gameMode === 'bot') {
-        players.push(createSnake(5 + offset, centerY, 1, 0, snakeColor, {
+        players.push(createSnake(5, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
             right: 'ArrowRight',
             speed: ' '
         }, false));
-        players.push(createSnake(GRID_WIDTH - 5 - offset, centerY, -1, 0, COLORS.bot, {}, true));
+        players.push(createSnake(GRID_WIDTH - 5, centerY, -1, 0, COLORS.bot, {}, true));
         document.getElementById('score2Display').classList.remove('hidden');
         document.getElementById('finalScore2Display').classList.remove('hidden');
     } else if (gameMode === 'pvp') {
-        players.push(createSnake(5 + offset, centerY, 1, 0, snakeColor, {
+        players.push(createSnake(5, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
             left: 'ArrowLeft',
             right: 'ArrowRight',
             speed: 'Shift'
         }, false));
-        players.push(createSnake(GRID_WIDTH - 5 - offset, centerY, -1, 0, COLORS.player2, {
+        players.push(createSnake(GRID_WIDTH - 5, centerY, -1, 0, COLORS.player2, {
             up: 'w',
             down: 's',
             left: 'a',
@@ -497,18 +495,10 @@ function spawnFood() {
     }
     
     do {
-        if (wallsMode === 'with_walls') {
-            // Spawn food away from walls
-            food = {
-                x: Math.floor(Math.random() * (GRID_WIDTH - 2)) + 1,
-                y: Math.floor(Math.random() * (GRID_HEIGHT - 2)) + 1
-            };
-        } else {
-            food = {
-                x: Math.floor(Math.random() * GRID_WIDTH),
-                y: Math.floor(Math.random() * GRID_HEIGHT)
-            };
-        }
+        food = {
+            x: Math.floor(Math.random() * GRID_WIDTH),
+            y: Math.floor(Math.random() * GRID_HEIGHT)
+        };
     } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y) || 
              walls.some(wall => wall.x === food.x && wall.y === food.y));
 }
@@ -545,13 +535,11 @@ function generateWalls() {
     for (let i = 0; i < wallCount; i++) {
         let attempts = 0;
         while (attempts < 100) {
-            const x = Math.floor(Math.random() * (GRID_WIDTH - 2)) + 1;
-            const y = Math.floor(Math.random() * (GRID_HEIGHT - 2)) + 1;
+            const x = Math.floor(Math.random() * GRID_WIDTH);
+            const y = Math.floor(Math.random() * GRID_HEIGHT);
             
-            // Check if not in forbidden areas or edges
+            // Check if not in forbidden areas
             if (!forbidden.some(f => f.x === x && f.y === y) &&
-                x !== 0 && y !== 0 && 
-                x !== GRID_WIDTH - 1 && y !== GRID_HEIGHT - 1 &&
                 !walls.some(w => w.x === x && w.y === y)) {
                 walls.push({ x, y });
                 break;
