@@ -928,6 +928,18 @@ function gameOver() {
 }
 
 function backToMenu() {
+    // Stop game and clear all intervals
+    gameRunning = false;
+    if (gameLoop) {
+        clearInterval(gameLoop);
+        gameLoop = null;
+    }
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    countdown = 0;
+    
     menuStep = 'mode';
     gameState = 'menu';
     document.getElementById('menu').classList.remove('hidden');
