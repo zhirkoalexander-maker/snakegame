@@ -382,13 +382,6 @@
             const btn = document.querySelector('.fullscreen-btn');
             btn.textContent = document.fullscreenElement ? '⛶' : '⛶';
         });
-        
-        // Keyboard shortcut F11 or F for fullscreen
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'f' && !gameRunning) {
-                toggleFullscreen();
-            }
-        });
     </script>
 </body>
 </html>
