@@ -1121,7 +1121,7 @@ function connectWebSocket() {
             document.getElementById('multiplayerStatus').innerHTML = `
                 <div style="color: #ff0000;">
                     ❌ Не удалось подключиться к серверу
-                    <br><small>Проверьте, что сервер запущен на Glitch</small>
+                    <br><small>Сервер запускается (до 15 сек). Попробуйте ещё раз.</small>
                 </div>
             `;
             reject(new Error('WebSocket connection failed'));
