@@ -1295,21 +1295,66 @@ function renderMultiplayerGame() {
     ctx.fillStyle = COLORS.food;
     ctx.fillRect(food.x * CELL_SIZE, food.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     
-    // Draw snakes
+    // Draw snakes with textures
     const colors = ['#00ff00', '#0099ff', '#ff9900', '#ff00ff'];
     multiplayerPlayers.forEach((player, index) => {
         if (!player.alive) return;
         
         const snakeBody = player.snake.body || player.snake;
-        ctx.fillStyle = colors[index % colors.length];
+        const playerColor = colors[index % colors.length];
+        
         snakeBody.forEach((segment, segIndex) => {
-            // Draw head brighter
+            const x = segment.x * CELL_SIZE;
+            const y = segment.y * CELL_SIZE;
+            
             if (segIndex === 0) {
-                ctx.fillStyle = colors[index % colors.length];
+                // Draw head with eyes
+                ctx.fillStyle = playerColor;
+                ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                
+                // Head shine
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fillRect(x + 3, y + 3, CELL_SIZE - 10, CELL_SIZE - 10);
+                
+                // Eyes
+                ctx.fillStyle = '#000';
+                const eyeSize = 3;
+                const eyeOffset = 5;
+                
+                // Determine eye position based on direction
+                const dir = player.direction || 'right';
+                if (dir === 'right') {
+                    ctx.fillRect(x + CELL_SIZE - eyeOffset - eyeSize, y + 5, eyeSize, eyeSize);
+                    ctx.fillRect(x + CELL_SIZE - eyeOffset - eyeSize, y + CELL_SIZE - 8, eyeSize, eyeSize);
+                } else if (dir === 'left') {
+                    ctx.fillRect(x + eyeOffset, y + 5, eyeSize, eyeSize);
+                    ctx.fillRect(x + eyeOffset, y + CELL_SIZE - 8, eyeSize, eyeSize);
+                } else if (dir === 'up') {
+                    ctx.fillRect(x + 5, y + eyeOffset, eyeSize, eyeSize);
+                    ctx.fillRect(x + CELL_SIZE - 8, y + eyeOffset, eyeSize, eyeSize);
+                } else { // down
+                    ctx.fillRect(x + 5, y + CELL_SIZE - eyeOffset - eyeSize, eyeSize, eyeSize);
+                    ctx.fillRect(x + CELL_SIZE - 8, y + CELL_SIZE - eyeOffset - eyeSize, eyeSize, eyeSize);
+                }
             } else {
-                ctx.fillStyle = colors[index % colors.length] + 'cc';
+                // Draw body with scale pattern
+                ctx.fillStyle = playerColor + 'cc';
+                ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                
+                // Scale texture
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.beginPath();
+                ctx.arc(x + CELL_SIZE / 2, y + CELL_SIZE / 2, CELL_SIZE / 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Additional pattern lines
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + 2, y + CELL_SIZE / 2);
+                ctx.lineTo(x + CELL_SIZE - 2, y + CELL_SIZE / 2);
+                ctx.stroke();
             }
-            ctx.fillRect(segment.x * CELL_SIZE, segment.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         });
     });
     
