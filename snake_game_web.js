@@ -39,6 +39,7 @@ const menuSteps = ['mode', 'settings', 'rules', 'color', 'start'];
 let players = [];
 let food = {};
 let foodType = 'normal'; // normal, golden (removed poison)
+let walls = []; // Wall obstacles
 
 // Bot AI
 let botDifficulty = 'medium';
@@ -436,6 +437,7 @@ function startGame() {
         document.getElementById('finalScore2Display').classList.remove('hidden');
     }
     
+    generateWalls();
     spawnFood();
     speed = normalSpeed;
     
@@ -507,7 +509,56 @@ function spawnFood() {
                 y: Math.floor(Math.random() * GRID_HEIGHT)
             };
         }
-    } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y));
+    } while (allSnakeCells.some(cell => cell.x === food.x && cell.y === food.y) || 
+             walls.some(wall => wall.x === food.x && wall.y === food.y));
+}
+
+function generateWalls() {
+    walls = [];
+    if (wallsMode !== 'with_walls') return;
+    
+    // Generate random walls based on speed (difficulty)
+    let wallCount = 30; // default
+    if (normalSpeed >= 200) wallCount = 30; // easy
+    else if (normalSpeed >= 100) wallCount = 60; // medium
+    else wallCount = 120; // hard
+    
+    const forbidden = [
+        // Center spawn positions
+        { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) },
+        { x: Math.floor(GRID_WIDTH / 4), y: Math.floor(GRID_HEIGHT / 2) },
+        { x: Math.floor(3 * GRID_WIDTH / 4), y: Math.floor(GRID_HEIGHT / 2) },
+        // Common starting positions
+        { x: 5, y: 5 },
+        { x: GRID_WIDTH - 6, y: GRID_HEIGHT - 6 },
+        { x: 10, y: 15 },
+        { x: 20, y: 15 }
+    ];
+    
+    // Add top-left corner to forbidden (for scores display)
+    for (let py = 0; py < 4; py++) {
+        for (let px = 0; px < 8; px++) {
+            forbidden.push({ x: px, y: py });
+        }
+    }
+    
+    for (let i = 0; i < wallCount; i++) {
+        let attempts = 0;
+        while (attempts < 100) {
+            const x = Math.floor(Math.random() * (GRID_WIDTH - 2)) + 1;
+            const y = Math.floor(Math.random() * (GRID_HEIGHT - 2)) + 1;
+            
+            // Check if not in forbidden areas or edges
+            if (!forbidden.some(f => f.x === x && f.y === y) &&
+                x !== 0 && y !== 0 && 
+                x !== GRID_WIDTH - 1 && y !== GRID_HEIGHT - 1 &&
+                !walls.some(w => w.x === x && w.y === y)) {
+                walls.push({ x, y });
+                break;
+            }
+            attempts++;
+        }
+    }
 }
 
 // Bot AI with autonomous speedup and attack strategies
@@ -606,6 +657,10 @@ function botMove(bot) {
                 newHead.y < 0 || newHead.y >= GRID_HEIGHT) {
                 safe = false;
             }
+            // Check wall obstacles
+            if (walls.some(wall => wall.x === newHead.x && wall.y === newHead.y)) {
+                safe = false;
+            }
         }
         
         // Self collision
@@ -678,8 +733,14 @@ function update() {
         
         // Wall handling
         if (wallsMode === 'with_walls') {
-            // Check wall collision - death if hit wall
+            // Check edge collision - death if hit edge
             if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
+                player.alive = false;
+                sounds.death();
+                return;
+            }
+            // Check wall obstacle collision
+            if (walls.some(wall => wall.x === head.x && wall.y === head.y)) {
                 player.alive = false;
                 sounds.death();
                 return;
@@ -786,25 +847,10 @@ function draw() {
     if (wallsMode === 'with_walls') {
         ctx.fillStyle = '#333333';
         
-        // Top wall
-        for (let x = 0; x < GRID_WIDTH; x++) {
-            ctx.fillRect(x * CELL_SIZE, 0, CELL_SIZE - 1, CELL_SIZE - 1);
-        }
-        
-        // Bottom wall
-        for (let x = 0; x < GRID_WIDTH; x++) {
-            ctx.fillRect(x * CELL_SIZE, (GRID_HEIGHT - 1) * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-        }
-        
-        // Left wall
-        for (let y = 0; y < GRID_HEIGHT; y++) {
-            ctx.fillRect(0, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-        }
-        
-        // Right wall
-        for (let y = 0; y < GRID_HEIGHT; y++) {
-            ctx.fillRect((GRID_WIDTH - 1) * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-        }
+        // Draw wall obstacles
+        walls.forEach(wall => {
+            ctx.fillRect(wall.x * CELL_SIZE, wall.y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        });
     }
     
     // Draw players with textures
