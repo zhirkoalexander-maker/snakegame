@@ -1323,15 +1323,6 @@ function renderMultiplayerGame() {
         ctx.fillStyle = color;
         ctx.fillText(`${player.name}: ${player.score} ${status}`, 10, 20 + (index * 25));
     });
-    ctx.fillStyle = '#00ff00';
-    ctx.font = '16px monospace';
-    ctx.textAlign = 'left';
-    multiplayerPlayers.forEach((player, index) => {
-        const color = colors[index % colors.length];
-        const status = player.alive ? '✓' : '✗';
-        ctx.fillStyle = color;
-        ctx.fillText(`${player.name}: ${player.score} ${status}`, 10, 20 + index * 20);
-    });
 }
 
 function endMultiplayerGame(data) {
