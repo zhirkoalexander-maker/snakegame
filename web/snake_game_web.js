@@ -1300,13 +1300,29 @@ function renderMultiplayerGame() {
     multiplayerPlayers.forEach((player, index) => {
         if (!player.alive) return;
         
+        const snakeBody = player.snake.body || player.snake;
         ctx.fillStyle = colors[index % colors.length];
-        player.snake.forEach(segment => {
+        snakeBody.forEach((segment, segIndex) => {
+            // Draw head brighter
+            if (segIndex === 0) {
+                ctx.fillStyle = colors[index % colors.length];
+            } else {
+                ctx.fillStyle = colors[index % colors.length] + 'cc';
+            }
             ctx.fillRect(segment.x * CELL_SIZE, segment.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         });
     });
     
     // Draw scores
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'left';
+    multiplayerPlayers.forEach((player, index) => {
+        const color = colors[index % colors.length];
+        const status = player.alive ? '✓' : '✗';
+        ctx.fillStyle = color;
+        ctx.fillText(`${player.name}: ${player.score} ${status}`, 10, 20 + (index * 25));
+    });
     ctx.fillStyle = '#00ff00';
     ctx.font = '16px monospace';
     ctx.textAlign = 'left';

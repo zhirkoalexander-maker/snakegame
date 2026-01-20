@@ -225,9 +225,9 @@ function updateGame(room) {
     }
   });
   
-  // Check game over
+  // Check game over (both players must be dead or only one alive)
   const alivePlayers = room.players.filter(p => p.alive);
-  if (alivePlayers.length <= 1) {
+  if (alivePlayers.length === 0 || (alivePlayers.length === 1 && room.players.length === 2)) {
     endGame(room);
     return;
   }
