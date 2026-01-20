@@ -116,13 +116,14 @@ function startGame(room) {
   
   room.players.forEach((player, index) => {
     const startX = index === 0 ? 5 : GRID_WIDTH - 6;
+    const dirX = index === 0 ? 1 : -1;
     player.snake = {
       body: [
         { x: startX, y: centerY },
-        { x: startX - (index === 0 ? 1 : -1), y: centerY },
-        { x: startX - (index === 0 ? 2 : -2), y: centerY }
+        { x: startX - dirX, y: centerY },
+        { x: startX - dirX * 2, y: centerY }
       ],
-      direction: { x: index === 0 ? 1 : -1, y: 0 }
+      direction: { x: dirX, y: 0 }
     };
     player.alive = true;
     player.score = 0;
@@ -197,8 +198,8 @@ function updateGame(room) {
     if (newHead.y < 0) newHead.y = GRID_HEIGHT - 1;
     if (newHead.y >= GRID_HEIGHT) newHead.y = 0;
     
-    // Check self collision
-    if (player.snake.body.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+    // Check self collision (skip head at index 0)
+    if (player.snake.body.slice(1).some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
       player.alive = false;
       return;
     }
