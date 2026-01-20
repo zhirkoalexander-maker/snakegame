@@ -1,0 +1,2 @@
+# This is a Node.js project
+# Python files are for desktop version only
