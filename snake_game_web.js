@@ -390,6 +390,12 @@ function startGame() {
     document.getElementById('gameScreen').classList.remove('hidden');
     document.getElementById('gameOver').classList.add('hidden');
     
+    // Show pause and restart buttons for non-multiplayer modes
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtns = document.querySelectorAll('button[onclick="restartGame()"]');
+    if (pauseBtn) pauseBtn.style.display = '';
+    restartBtns.forEach(btn => btn.style.display = '');
+    
     const centerX = Math.floor(GRID_WIDTH / 2);
     const centerY = Math.floor(GRID_HEIGHT / 2);
     
@@ -1260,6 +1266,12 @@ function startMultiplayerGameClient(data) {
     gameRunning = true;
     multiplayerPlayers = data.players;
     food = data.food;
+    
+    // Hide pause and restart buttons in multiplayer
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtns = document.querySelectorAll('button[onclick="restartGame()"]');
+    if (pauseBtn) pauseBtn.style.display = 'none';
+    restartBtns.forEach(btn => btn.style.display = 'none');
     
     // Start render loop
     gameLoop = setInterval(renderMultiplayerGame, 50);
