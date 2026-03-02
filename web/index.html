@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Snake Game - Play Online</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,152 +14,248 @@
             box-sizing: border-box;
         }
         body {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #fff;
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+            font-family: 'Space Mono', monospace;
+            color: #e0e0e0;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(0, 255, 0, 0.02) 0px,
+                    rgba(0, 255, 0, 0.02) 1px,
+                    transparent 1px,
+                    transparent 2px
+                );
+            pointer-events: none;
+            z-index: 1;
+            animation: scanlines 8s linear infinite;
+        }
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
         }
         .container {
             text-align: center;
+            max-width: 900px;
+            position: relative;
+            z-index: 2;
         }
         h1 {
+            font-family: 'Press Start 2P', cursive;
             font-size: 3em;
-            text-shadow: 0 0 30px rgba(0, 255, 0, 0.7);
+            font-weight: 400;
             color: #00ff00;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5), 0 0 20px rgba(0, 255, 0, 0.3);
+            animation: glitch 0.3s infinite;
+        }
+        @keyframes glitch {
+            0%, 100% { text-shadow: 0 0 10px rgba(0, 255, 0, 0.5); }
+            50% { text-shadow: 0 0 20px rgba(0, 255, 0, 0.8), 0 0 30px rgba(255, 0, 100, 0.5); }
+        }
+        .tagline {
+            color: #00ff00;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+            font-weight: 400;
+            letter-spacing: 1px;
         }
         .game-wrapper {
-            background: rgba(0, 0, 0, 0.5);
-            padding: 20px;
-            border-radius: 15px;
-            border: 2px solid #00ff00;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
-            margin: 20px auto;
+            background: #000;
+            padding: 30px;
+            border-radius: 0;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3), inset 0 0 30px rgba(0, 255, 0, 0.1);
+            margin: 30px auto;
+            border: 3px solid #00ff00;
+            position: relative;
+        }
+        .game-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            pointer-events: none;
         }
         canvas {
-            border-radius: 10px;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+            border-radius: 2px;
             display: block;
             background: #000;
+            border: 2px solid #00ff00;
+            max-width: 100%;
+            height: auto;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
         .score {
-            font-size: 1.5em;
+            font-size: 1.2em;
             color: #00ff00;
             margin: 15px 0;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
         .score-display {
             display: flex;
             justify-content: center;
             gap: 40px;
-            margin: 15px 0;
+            margin: 20px 0;
         }
         .buttons {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: center;
-            margin: 20px 0;
+            margin: 25px 0;
             flex-wrap: wrap;
         }
         button, .btn {
-            padding: 12px 30px;
-            font-size: 1em;
-            border: none;
-            border-radius: 8px;
+            padding: 12px 28px;
+            font-size: 0.95em;
+            border: 2px solid #00ff00;
+            background: transparent;
+            border-radius: 0;
             cursor: pointer;
-            transition: all 0.3s;
-            font-weight: bold;
+            transition: all 0.1s ease;
+            font-weight: 700;
             text-decoration: none;
             display: inline-block;
+            font-family: 'Space Mono', monospace;
+            color: #00ff00;
+            letter-spacing: 1px;
+        }
+        button:hover, .btn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.7);
         }
         .btn-primary {
             background: #00ff00;
             color: #000;
         }
         .btn-primary:hover {
-            background: #00cc00;
-            transform: scale(1.05);
+            background: #00ff00;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.9);
         }
         .btn-secondary {
-            background: #333;
-            color: #fff;
+            background: transparent;
+            color: #00ff00;
             border: 2px solid #00ff00;
         }
         .btn-secondary:hover {
-            background: #444;
-            transform: scale(1.05);
-        }
-        .btn-download {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            border: 2px solid #fff;
-        }
-        .btn-download:hover {
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-            transform: scale(1.05);
-            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
-        }
-        .btn-warning {
-            background: #ffa500;
+            background: #00ff00;
             color: #000;
         }
+        .btn-download {
+            background: linear-gradient(135deg, #ff00ff 0%, #00ffff 100%);
+            color: #000;
+            border: 2px solid #ff00ff;
+        }
+        .btn-download:hover {
+            background: linear-gradient(135deg, #ff00ff 0%, #00ffff 100%);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.7);
+        }
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+        .btn-warning {
+            background: transparent;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+        }
         .btn-warning:hover {
-            background: #ff8c00;
-            transform: scale(1.05);
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.7);
         }
         .btn-success {
-            background: #00cc00;
-            color: #fff;
+            background: #00ff00;
+            color: #000;
         }
         .btn-success:hover {
-            background: #00aa00;
-            transform: scale(1.05);
+            background: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
         }
         .version-badge {
             display: inline-block;
-            background: rgba(0, 255, 0, 0.2);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            margin: 0 10px;
+            background: transparent;
+            padding: 8px 16px;
+            border-radius: 0;
+            font-size: 0.8em;
+            margin: 0 8px;
             border: 1px solid #00ff00;
+            color: #00ff00;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
         #menu, #gameOver {
-            background: rgba(0, 0, 0, 0.95);
+            background: #000;
             padding: 40px;
-            border-radius: 15px;
+            border-radius: 0;
             border: 3px solid #00ff00;
             max-width: 600px;
             margin: 20px auto;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            position: relative;
+        }
+        #menu::before, #gameOver::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            pointer-events: none;
         }
         #menu h2, #gameOver h2 {
             color: #00ff00;
-            font-size: 2em;
+            font-size: 1.8em;
             margin-bottom: 30px;
+            font-family: 'Press Start 2P', cursive;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
         #gameOver h2 {
             color: #ff0000;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
         }
         .menu-option {
-            background: rgba(0, 255, 0, 0.1);
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 10px;
+            background: transparent;
+            padding: 16px;
+            margin: 12px 0;
+            border-radius: 0;
             border: 2px solid #00ff00;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.1s ease;
+            color: #00ff00;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
         .menu-option:hover {
-            background: rgba(0, 255, 0, 0.2);
-            transform: scale(1.02);
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.7);
         }
         .menu-option.selected {
-            background: rgba(0, 255, 0, 0.3);
-            border-color: #00ff00;
+            background: #00ff00;
+            color: #000;
+            font-weight: 700;
         }
         .hidden {
             display: none !important;
@@ -171,106 +270,166 @@
         .color-option {
             width: 50px;
             height: 50px;
-            border-radius: 50%;
+            border-radius: 0;
             cursor: pointer;
-            border: 3px solid transparent;
-            transition: all 0.3s;
+            border: 2px solid #00ff00;
+            transition: all 0.1s ease;
+            background: #1a1a2e;
         }
         .color-option:hover {
-            transform: scale(1.2);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
         }
         .color-option.selected {
-            border-color: #fff;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            border-color: #00ff00;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.8), inset 0 0 15px rgba(0, 255, 0, 0.3);
         }
         .theme-option {
-            padding: 15px;
-            margin: 10px;
-            border-radius: 10px;
+            padding: 12px 20px;
+            margin: 8px;
+            border-radius: 0;
             cursor: pointer;
-            border: 2px solid transparent;
-            transition: all 0.3s;
+            border: 2px solid #00ff00;
+            transition: all 0.1s ease;
             display: inline-block;
+            color: #00ff00;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: transparent;
         }
         .theme-option:hover {
-            transform: scale(1.05);
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
         }
         .theme-option.selected {
             border-color: #00ff00;
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
         }
         .leaderboard {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 20px;
-            border-radius: 10px;
+            background: #000;
+            padding: 30px;
+            border-radius: 0;
             margin: 20px 0;
-            max-width: 400px;
+            max-width: 500px;
             margin-left: auto;
             margin-right: auto;
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            position: relative;
+        }
+        .leaderboard::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            pointer-events: none;
+        }
+        .leaderboard h2 {
+            color: #00ff00;
+            font-family: 'Press Start 2P', cursive;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
         .leaderboard-entry {
-            padding: 10px;
-            margin: 5px 0;
-            background: rgba(0, 255, 0, 0.1);
-            border-radius: 5px;
+            padding: 12px;
+            margin: 8px 0;
+            background: transparent;
+            border-radius: 0;
+            border: 1px solid rgba(0, 255, 0, 0.4);
+            color: #00ff00;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
         .footer {
-            margin-top: 30px;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 10px;
-            border: 2px solid #00ff00;
-            max-width: 600px;
+            margin-top: 40px;
+            padding: 30px;
+            background: #000;
+            border-radius: 0;
+            border: 3px solid #00ff00;
+            max-width: 700px;
             margin-left: auto;
             margin-right: auto;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            position: relative;
+        }
+        .footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            pointer-events: none;
         }
         .footer p {
-            color: #aaa;
+            color: #00ff00;
             margin: 10px 0;
             line-height: 1.6;
+            font-size: 0.9em;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+        .footer strong {
+            color: #00ff00;
         }
         .footer a {
-            color: #00ff00;
+            color: #00ffff;
             text-decoration: none;
-            font-weight: bold;
-            transition: all 0.3s;
+            font-weight: 700;
+            transition: all 0.1s ease;
+            letter-spacing: 0.5px;
         }
         .footer a:hover {
-            color: #00cc00;
-            text-decoration: underline;
+            color: #ff00ff;
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.6);
         }
         .fullscreen-btn {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: rgba(0, 255, 0, 0.2);
+            background: #000;
             border: 2px solid #00ff00;
             color: #00ff00;
-            padding: 10px 15px;
-            border-radius: 8px;
+            padding: 10px 14px;
+            border-radius: 0;
             cursor: pointer;
-            font-size: 20px;
-            transition: all 0.3s;
+            font-size: 16px;
+            transition: all 0.1s ease;
             z-index: 1000;
+            font-weight: 700;
         }
         .fullscreen-btn:hover {
-            background: rgba(0, 255, 0, 0.4);
-            transform: scale(1.1);
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.7);
         }
         /* Themes */
         body.dark {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+            color: #00ff00;
         }
         body.light {
-            background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
+            background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
+            color: #00ff00;
         }
         body.neon {
-            background: linear-gradient(135deg, #0f0f23 0%, #1a0033 100%);
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a0033 100%);
+            color: #ff00ff;
         }
         body.forest {
             background: linear-gradient(135deg, #1a3a1a 0%, #0d260d 100%);
+            color: #00ff00;
         }
         body.ocean {
             background: linear-gradient(135deg, #0a2540 0%, #051829 100%);
+            color: #00aaff;
         }
     </style>
 </head>
@@ -278,26 +437,27 @@
     <button class="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
     
     <div class="container">
-        <h1>🐍 Snake Game 🐍</h1>
-        <div style="text-align: center; margin-bottom: 10px;">
-            <span class="version-badge">🌐 Web Version</span>
-            <span class="version-badge">🖥️ Desktop Available</span>
+        <h1>SNAKE</h1>
+        <p class="tagline">> RETRO ARCADE GAME</p>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <span class="version-badge">🌐 WEB</span>
+            <span class="version-badge">🖥️ DESKTOP</span>
         </div>
         
         <!-- Menu -->
         <div id="menu">
-            <h2>Main Menu</h2>
+            <h2>PLAY</h2>
             <div id="menuContent"></div>
         </div>
         
         <!-- Leaderboard -->
         <div id="leaderboardScreen" class="hidden">
             <div class="leaderboard">
-                <h2 style="color: #00ff00; margin-bottom: 20px;">🏆 Leaderboard</h2>
+                <h2>★ LEADERBOARD ★</h2>
                 <div id="leaderboardList"></div>
                 <div class="buttons" style="margin-top: 20px;">
-                    <button class="btn-secondary" onclick="backToMenu()">← Back to Menu</button>
-                    <button class="btn-primary" onclick="clearLeaderboard()">Clear Records</button>
+                    <button class="btn-secondary" onclick="backToMenu()">← BACK</button>
+                    <button class="btn-primary" onclick="clearLeaderboard()">CLEAR</button>
                 </div>
             </div>
         </div>
@@ -306,10 +466,10 @@
         <div id="gameScreen" class="hidden">
             <div class="score-display">
                 <div class="score">
-                    P1 Score: <span id="score1">0</span>
+                    P1 SCORE: <span id="score1">0</span>
                 </div>
                 <div class="score" id="score2Display" class="hidden">
-                    P2 Score: <span id="score2">0</span>
+                    P2 SCORE: <span id="score2">0</span>
                 </div>
             </div>
             
@@ -318,48 +478,48 @@
             </div>
             
             <div class="buttons">
-                <button id="pauseBtn" class="btn-warning" onclick="togglePause()">⏸️ Pause</button>
-                <button class="btn-primary" onclick="restartGame()">🔄 Restart</button>
-                <button class="btn-secondary" onclick="backToMenu()">← Menu</button>
+                <button id="pauseBtn" class="btn-warning" onclick="togglePause()">⏸ PAUSE</button>
+                <button class="btn-primary" onclick="restartGame()">⟲ RESTART</button>
+                <button class="btn-secondary" onclick="backToMenu()">← MENU</button>
             </div>
         </div>
         
         <!-- Game Over -->
         <div id="gameOver" class="hidden">
-            <h2>Game Over!</h2>
-            <p class="score">Winner: <span id="winner">-</span></p>
-            <p class="score">P1 Score: <span id="finalScore1">0</span></p>
-            <p class="score" id="finalScore2Display" class="hidden">P2 Score: <span id="finalScore2">0</span></p>
+            <h2>GAME OVER</h2>
+            <p class="score">WINNER: <span id="winner">-</span></p>
+            <p class="score">P1 SCORE: <span id="finalScore1">0</span></p>
+            <p class="score" id="finalScore2Display" class="hidden">P2 SCORE: <span id="finalScore2">0</span></p>
             <div class="buttons">
-                <button class="btn-primary" onclick="restartGame()">🔄 Restart</button>
-                <button class="btn-secondary" onclick="backToMenu()">← Menu</button>
+                <button class="btn-primary" onclick="restartGame()">⟲ RESTART</button>
+                <button class="btn-secondary" onclick="backToMenu()">← MENU</button>
             </div>
         </div>
     </div>
     
     <div class="footer">
-        <p>🐍 <strong>Snake Game</strong> - Classic arcade game reimagined</p>
+        <p><strong>SNAKE</strong> — CLASSIC ARCADE GAME REIMAGINED</p>
         <p style="margin: 20px 0;">
             <a href="https://raw.githubusercontent.com/zhirkoalexander-maker/snakegame/main/snake_game_desktop.py" 
                download="snake_game_desktop.py" 
                class="btn btn-download" 
-               style="padding: 15px 30px; font-size: 1.1em;">
-                🐍 Download Python Desktop Version (Power-Ups Mode!)
+               style="padding: 15px 30px; font-size: 1em;">
+                🐍 DOWNLOAD DESKTOP (POWER-UPS!)
             </a>
         </p>
-        <p style="font-size: 0.95em; color: #aaa; margin: 15px 0;">
-            <strong>Desktop version features:</strong><br>
-            ⚡ Power-Up Mode: Shield, Ghost, Magnet, Speed & Shrink abilities<br>
-            🎨 5 Beautiful Themes & Custom Controls<br>
-            🤖 Smart AI Bot & Local Leaderboard<br>
-            📦 Requires: Python 3.8+ and pygame
+        <p style="font-size: 0.9em; margin: 15px 0;">
+            <strong>DESKTOP FEATURES:</strong><br>
+            ⚡ POWER-UPS: SHIELD, GHOST, MAGNET, SPEED, SHRINK<br>
+            🎨 5 THEMES + CUSTOM CONTROLS<br>
+            🤖 SMART AI BOT<br>
+            📦 PYTHON 3.8+ • PYGAME
         </p>
         <p>
-            📦 <a href="https://github.com/zhirkoalexander-maker/snakegame" target="_blank">View Source on GitHub</a> | 
-            <a href="https://github.com/zhirkoalexander-maker/snakegame/blob/main/README.md" target="_blank">Installation Guide</a>
+            📦 <a href="https://github.com/zhirkoalexander-maker/snakegame" target="_blank">GITHUB</a> | 
+            <a href="https://github.com/zhirkoalexander-maker/snakegame/blob/main/README.md" target="_blank">DOCS</a>
         </p>
-        <p style="font-size: 0.9em; color: #666;">
-            Made with ❤️ using Pygame (Desktop) and HTML5 Canvas (Web)
+        <p style="font-size: 0.85em; color: #888;">
+            MADE WITH ❤️ USING PYGAME & HTML5
         </p>
     </div>
     

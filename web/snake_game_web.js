@@ -22,6 +22,18 @@ let countdown = 0;
 let countdownInterval = null;
 let highScore = 0;
 
+// Power-Up System
+let powerupMode = false;
+let powerupSelectionActive = false;
+let availablePowerups = [];
+let selectedPowerupIndex = 0;
+let applesCollected = 0;
+let activePowerups = [];
+let playerInvincible = false;
+let playerGhostMode = false;
+let playerMagnetRange = 0;
+let originalSpeed = 150;
+
 // Multiplayer
 // Сервер на Render.com - система комнат на 2 игрока
 const SERVER_URL = 'wss://snakegame-server-new.onrender.com';
@@ -227,6 +239,10 @@ function renderMenu() {
                 <h4>🤖 Player vs Bot</h4>
                 <p>Challenge AI opponent!</p>
             </div>
+            <div class="menu-option" onclick="selectMode('powerup')">
+                <h4>⚡ Power-Ups Mode</h4>
+                <p>Collect apples, choose power-ups!</p>
+            </div>
             <div class="menu-option" onclick="selectMode('pvp')">
                 <h4>👥 Player vs Player</h4>
                 <p>Compete with a friend!</p>
@@ -402,6 +418,24 @@ function startGame() {
     // Setup players
     players = [];
     if (gameMode === 'single') {
+        players.push(createSnake(centerX, centerY, 1, 0, snakeColor, {
+            up: 'ArrowUp',
+            down: 'ArrowDown',
+            left: 'ArrowLeft',
+            right: 'ArrowRight',
+            speed: ' '
+        }, false));
+        document.getElementById('score2Display').classList.add('hidden');
+        document.getElementById('finalScore2Display').classList.add('hidden');
+    } else if (gameMode === 'powerup') {
+        powerupMode = true;
+        applesCollected = 0;
+        activePowerups = [];
+        playerInvincible = false;
+        playerGhostMode = false;
+        playerMagnetRange = 0;
+        originalSpeed = normalSpeed;
+        speed = normalSpeed;
         players.push(createSnake(centerX, centerY, 1, 0, snakeColor, {
             up: 'ArrowUp',
             down: 'ArrowDown',
